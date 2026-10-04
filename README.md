@@ -50,7 +50,7 @@ Open the manager page using the intended player-facing URL, for example `https:/
 docker build --build-arg APP_BASE_PATH=/monopoly/ -t monopoly .
 ```
 
-Keep `/monopoly/` in the upstream request path, enable WebSocket upgrades, and preserve the public Host header. Configure `TRUSTED_PROXIES` with a comma-separated list of proxy IPs when forwarding `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For`; loopback proxies are trusted by default. Set `ALLOW_LOCAL_MANAGER=false` for public proxy deployments so setup always requires the manager code. TLS can terminate at the proxy. Frontend and backend base paths must agree. Windows publishing defaults to root hosting; Docker defaults to `/monopoly/`.
+Keep `/monopoly/` in the upstream request path and enable WebSocket upgrades. As in SeguiLaFolla, the backend does not reject requests because the browser Origin differs from the upstream Host. Forwarded headers are accepted from all proxies, including proxy chains; no `TRUSTED_PROXIES` configuration is required. When supplied, `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For` restore the public request information. Set `ALLOW_LOCAL_MANAGER=false` for public proxy deployments so setup always requires the manager code. TLS can terminate at the proxy. Frontend and backend base paths must agree. Windows publishing defaults to root hosting; Docker defaults to `/monopoly/`.
 
 Each new table gets an opaque match ID. Its API requests, WebSocket group and player/manager cookies are isolated from other tables. Refreshing a match URL rejoins that table; **New table** creates a separate match while existing tables continue running. Keep the full match link when opening `/play` or `/display`.
 

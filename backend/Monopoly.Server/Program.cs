@@ -13,9 +13,14 @@ builder.Services.AddScoped<MatchService>(services => services.GetRequiredService
 builder.Services.AddSignalR(options => options.MaximumReceiveMessageSize = 16 * 1024);
 builder.Services.AddHostedService<GameTicker>();
 var app = builder.Build();
-var forwarded = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost };
-foreach (var address in (builder.Configuration["TRUSTED_PROXIES"] ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-    forwarded.KnownProxies.Add(IPAddress.Parse(address));
+var forwarded = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost,
+    ForwardLimit = null
+};
+// Accept forwarded headers from any proxy, as requested for this deployment.
+forwarded.KnownProxies.Clear();
+forwarded.KnownIPNetworks.Clear();
 app.UseForwardedHeaders(forwarded);
 var basePath = builder.Configuration["APP_BASE_PATH"]?.Trim().Trim('/') ?? "";
 if (basePath.Length > 0)
@@ -30,10 +35,6 @@ if (basePath.Length > 0)
 
 app.Use(async (context, next) =>
 {
-    // Same-origin cookies protect both HTTP mutations and the WebSocket handshake.
-    if (context.Request.Headers.TryGetValue("Origin", out var origin) &&
-        (!Uri.TryCreate(origin.ToString(), UriKind.Absolute, out var uri) || uri.Authority != context.Request.Host.Value))
-    { context.Response.StatusCode = 403; return; }
     try { await next(); }
     catch (InvalidOperationException e) { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { error = e.Message }); }
 });
