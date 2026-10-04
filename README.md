@@ -60,11 +60,18 @@ The locally bundled font is the **Monopoly Inline demo** from the requested [Mon
 
 [`.github/workflows/docker.yml`](.github/workflows/docker.yml) runs only when a version tag in the form `vX.X.X` is pushed, such as `v1.2.3` or `v10.20.30`. It runs the engine checks, builds the full Docker image with Buildx caching using the default `/monopoly/` base path, starts the image, and verifies both the API and frontend routes. After those checks pass, it publishes the same image to **GitHub Container Registry** as `ghcr.io/<owner>/<repository>:<version-tag>` (repository names are lowercased), and also uploads the image archive as an artifact. The workflow authenticates with GitHub's built-in `GITHUB_TOKEN` and `packages: write`; no extra registry secret is required.
 
-For this repository, a `v1.2.3` tag publishes `ghcr.io/andreaci/monopoly:v1.2.3`:
+Following the SeguiLaFolla container metadata template, each release publishes its original tag, semantic version, minor and major aliases (no major alias for `0.x`), and **`latest`**. Every successful release updates `latest` to that release image. For example, `v1.2.3` publishes `ghcr.io/andreaci/monopoly` with tags `v1.2.3`, `1.2.3`, `1.2`, `1`, and `latest`:
 
 ```powershell
 docker pull ghcr.io/andreaci/monopoly:v1.2.3
 docker run --rm -p 5080:5080 ghcr.io/andreaci/monopoly:v1.2.3
+```
+
+To use the latest published release:
+
+```powershell
+docker pull ghcr.io/andreaci/monopoly:latest
+docker run --rm -p 5080:5080 ghcr.io/andreaci/monopoly:latest
 ```
 
 Open `http://localhost:5080/monopoly/`. New GHCR packages are private by default; set the package visibility to public in GitHub if you want unauthenticated pulls, or authenticate to pull a private package.

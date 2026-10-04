@@ -16,6 +16,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      IMAGE_NAME: ghcr.io/${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -24,6 +27,17 @@ jobs:
       - name: Verify game rules
         run: dotnet run --project tests/Monopoly.GameEngine.Tests -c Release
       - uses: docker/setup-buildx-action@v3
+      - name: Generate container metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ env.RELEASE_TAG }}
+            type=semver,pattern={{version}},value=${{ env.RELEASE_TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.RELEASE_TAG }}
+            type=semver,pattern={{major}},value=${{ env.RELEASE_TAG }},enable=${{ !startsWith(env.RELEASE_TAG, 'v0.') }}
+            type=raw,value=latest
       - name: Build frontend and backend container
         uses: docker/build-push-action@v6
         with:
@@ -31,10 +45,7 @@ jobs:
           load: true
           push: false
           tags: monopoly:ci
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ github.ref_name }}
+          labels: ${{ steps.metadata.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Check static frontend and API
@@ -68,13 +79,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish the verified version image
+      - name: Publish the verified release tags
         shell: bash
+        env:
+          IMAGE_TAGS: ${{ steps.metadata.outputs.tags }}
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_REF_NAME}"
-          docker tag monopoly:ci "$image"
-          docker push "$image"
-          echo "Published \`$image\` (application base path: \`/monopoly/\`)." >> "$GITHUB_STEP_SUMMARY"
+          while IFS= read -r image; do
+            [ -n "$image" ] || continue
+            docker tag monopoly:ci "$image"
+            docker push "$image"
+            echo "Published \`$image\` (application base path: \`/monopoly/\`)." >> "$GITHUB_STEP_SUMMARY"
+          done <<< "$IMAGE_TAGS"
       - name: Export the runnable image
         run: docker save -o monopoly-image.tar monopoly:ci
       - uses: actions/upload-artifact@v4
