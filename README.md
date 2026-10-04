@@ -56,7 +56,7 @@ Each new table gets an opaque match ID. Its API requests, WebSocket group and pl
 
 Phone card draws appear as animated fullscreen cards with a Continue button. Consecutive draws are queued, and dismissed cards are remembered for the browser tab. Tokens include both metal-style figurines and painted wooden pieces based on the supplied references.
 
-The locally bundled **Monopoly Regular and Bold** fonts by Hyunseok Choi replace the outlined font. The designer provides them free for personal and commercial use. See `frontend/public/fonts/README.md` for the source and included readme.
+The whole interface uses the device’s standard system sans-serif font, including headings, board labels and cards. No custom fonts or font downloads are required.
 
 [`.github/workflows/docker.yml`](.github/workflows/docker.yml) runs only when a version tag in the form `vX.X.X` is pushed, such as `v1.2.3` or `v10.20.30`. It runs the engine checks, builds the full Docker image with Buildx caching using the default `/monopoly/` base path, starts the image, and verifies both the API and frontend routes. After those checks pass, it publishes the same image to **GitHub Container Registry** as `ghcr.io/<owner>/<repository>:<version-tag>` (repository names are lowercased), and also uploads the image archive as an artifact. The workflow authenticates with GitHub's built-in `GITHUB_TOKEN` and `packages: write`; no extra registry secret is required.
 
