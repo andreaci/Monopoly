@@ -37,13 +37,26 @@ jobs:
         run: |
           docker run -d --name monopoly-ci -p 5080:5080 monopoly:ci
           trap 'docker logs monopoly-ci; docker rm -f monopoly-ci' EXIT
+          ready=false
           for attempt in {1..30}; do
-            if curl -fsS http://localhost:5080/monopoly/api/session > /tmp/session.json; then break; fi
+            if curl -fsS --connect-timeout 2 --max-time 5 -D /tmp/session.headers http://localhost:5080/monopoly/api/session -o /tmp/session.json; then
+              if ! grep -qi '^content-type: application/json' /tmp/session.headers; then
+                echo 'Session API returned a non-JSON response; check APP_BASE_PATH and routing order.' >&2
+                cat /tmp/session.headers /tmp/session.json >&2
+                exit 1
+              fi
+              python3 -c 'import json; s=json.load(open("/tmp/session.json")); assert s["state"]["phase"] == "lobby"; assert len(s["state"]["board"]) == 40'
+              ready=true
+              break
+            fi
             sleep 1
           done
+          if [ "$ready" != true ]; then
+            echo 'Session API did not become ready within 30 attempts.' >&2
+            exit 1
+          fi
           curl -fsS http://localhost:5080/monopoly/ | grep -q '<div id="app">'
           curl -fsS http://localhost:5080/monopoly/join | grep -q '<div id="app">'
-          python3 -c 'import json; s=json.load(open("/tmp/session.json")); assert s["state"]["phase"] == "lobby"; assert len(s["state"]["board"]) == 40'
       - name: Export the runnable image
         run: docker save -o monopoly-image.tar monopoly:ci
       - uses: actions/upload-artifact@v4

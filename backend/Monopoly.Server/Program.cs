@@ -39,6 +39,9 @@ app.Use(async (context, next) =>
 });
 app.UseDefaultFiles();
 app.UseStaticFiles();
+// Route matching must run after UsePathBase strips the configured prefix.
+// Otherwise WebApplication's implicit routing matches /monopoly/api/... to the SPA fallback.
+app.UseRouting();
 
 bool IsManager(HttpContext context, MatchService match) => context.Request.Cookies[match.ManagerCookie] == match.ManagerSecret;
 
