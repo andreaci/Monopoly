@@ -10,6 +10,7 @@ public sealed class Settings
     public bool Buildings { get; set; } = true;
     public bool Jail { get; set; } = true;
     public bool Mortgages { get; set; } = true;
+    public bool BankRent { get; set; }
     public int Scale => Language == "it-GBP" ? 100 : 1;
     public string Currency => Language switch { "en" => "$", "it-GBP" => "£", _ => "€" };
     public bool Italian => Language.StartsWith("it");
@@ -41,6 +42,7 @@ public sealed record Card(string Id, string Deck, string En, string It, string E
 public sealed record Payment(string From, string? To, int Amount, string Reason);
 public sealed record LogEntry(long Sequence, string En, string It, DateTimeOffset At);
 public sealed record Roll(string PlayerId, int Die1, int Die2, DateTimeOffset StartedAt, DateTimeOffset EndsAt, bool Utility = false);
+public sealed record Landing(string PlayerId, int SquareId, DateTimeOffset MovementStartsAt, int[] Path, DateTimeOffset StartedAt, DateTimeOffset LocationEndsAt, DateTimeOffset EndsAt, bool AutoAdvance, bool ExtraRoll);
 
 public sealed class Auction
 {

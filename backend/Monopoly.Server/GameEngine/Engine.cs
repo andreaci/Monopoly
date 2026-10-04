@@ -16,6 +16,7 @@ public sealed partial class Engine
     public int Turn { get; private set; }
     public long Revision { get; private set; }
     public Roll? Roll { get; private set; }
+    public Landing? Landing { get; private set; }
     public Auction? Auction { get; private set; }
     public Trade? Trade { get; private set; }
     public Card? LastCard { get; private set; }
@@ -36,6 +37,9 @@ public sealed partial class Engine
     private bool extraRoll;
     private bool utilityRoll;
     private bool jailReleaseRoll;
+    private bool finishDeclinedTurn;
+    private string? pendingLandingPlayer;
+    private readonly List<int> movementPath = [];
     private readonly HashSet<string> processed = [];
     private readonly Queue<string> processedOrder = new();
     private readonly Func<int> nextDie;
@@ -97,7 +101,7 @@ public sealed partial class Engine
     public object Snapshot(string? playerId = null) => new
     {
         matchId = MatchId, revision = Revision, serverTime = DateTimeOffset.UtcNow, settings = Settings, phase = Phase,
-        activePlayerId = Active?.Id, players = Players, deeds = Deeds, dice = Roll,
+        activePlayerId = Active?.Id, players = Players, deeds = Deeds, dice = Roll, landing = Landing,
         auction = Auction, trade = Trade, debt = Debt is { } debt ? new { debt.From, debt.To, debt.Amount, reason = PaymentReason(debt, Settings.Italian) } : null, waitingFor = WaitingFor,
         winnerId = WinnerId, housesLeft = HousesLeft, hotelsLeft = HotelsLeft,
         rentDue = Phase is "rent" or "consent" or "auction" ? Rent(Deed(Active!.Position)) : 0,
@@ -142,7 +146,7 @@ public sealed partial class Engine
             actions.Add("roll");
             if (p.InJail) { actions.Add("jailPay"); if (p.JailCards.Count > 0) actions.Add("jailCard"); }
         }
-        if (active && Phase == "purchase") { actions.Add("buy"); actions.Add("decline"); }
+        if (active && Phase == "purchase") { actions.Add("buy"); actions.Add("decline"); actions.Add("declineEndTurn"); }
         if (active && Phase == "rent")
         {
             actions.Add("payRent");
@@ -181,7 +185,12 @@ public sealed partial class Engine
             case "jailCard":
                 var id = p.JailCards.First(); p.JailCards.Remove(id); ReturnCard(id); p.InJail = false; p.JailAttempts = 0; break;
             case "buy": Buy(p); break;
-            case "decline": FinishMove(); break;
+            case "decline": case "declineEndTurn":
+                finishDeclinedTurn = command.Type == "declineEndTurn";
+                if (!Settings.BankRent) FinishDeclinedPurchase();
+                else if (Board.Squares[p.Position].Type == "utility" && rentMultiplier == 10) BeginRoll(p, true);
+                else SettleBankRent(Deed(p.Position));
+                break;
             case "payRent": SettleRent(); break;
             case "requestAuction": RequestAuction(p); break;
             case "auctionConsent": Consent(p, command); break;
@@ -197,6 +206,7 @@ public sealed partial class Engine
             case "tradeCancel": Trade = null; break;
             case "bankrupt": Bankruptcy(p); break;
         }
+        ShowPendingLanding(DateTimeOffset.UtcNow);
         processed.Add(key); processedOrder.Enqueue(key);
         if (processedOrder.Count > 10000) processed.Remove(processedOrder.Dequeue());
         Changed();
@@ -206,6 +216,17 @@ public sealed partial class Engine
     {
         var changed = false;
         if (Phase == "rolling" && Roll != null && now >= Roll.EndsAt) { ResolveRoll(); changed = true; }
+        changed |= ShowPendingLanding(now);
+        if (Landing is { } landing && now >= landing.EndsAt && (!landing.AutoAdvance || WaitingFor == null))
+        {
+            Landing = null;
+            if (landing.AutoAdvance && Phase == "end")
+            {
+                Note($"{Find(landing.PlayerId).Name}'s turn finishes.", $"Il turno di {Find(landing.PlayerId).Name} termina.");
+                EndTurn();
+            }
+            changed = true;
+        }
         if (Phase == "auction" && Auction != null)
         {
             changed |= UpdateAuctionPause(now);
@@ -246,7 +267,7 @@ public sealed partial class Engine
         if (jailReleaseRoll)
         {
             if (doubles) { p.InJail = false; p.JailAttempts = 0; }
-            else if (++p.JailAttempts < 3) { Phase = "end"; return; }
+            else if (++p.JailAttempts < 3) { Phase = "end"; pendingLandingPlayer = p.Id; return; }
             else
             {
                 Charge([new(p.Id, null, 50 * Settings.Scale, "Jail / Prigione")], () => { p.InJail = false; p.JailAttempts = 0; Advance(p, total); });
@@ -264,6 +285,7 @@ public sealed partial class Engine
     private void Advance(Player p, int steps, bool forward = true)
     {
         var old = p.Position;
+        RecordMovement(old, steps);
         p.Position = (old + steps + 40) % 40;
         if (forward && old + steps >= 40) Credit(p, Settings.GoPayment, "GO", "VIA");
         rentMultiplier = 1;
@@ -272,6 +294,8 @@ public sealed partial class Engine
 
     private void MoveTo(Player p, int target, int multiplier = 1)
     {
+        var steps = (target - p.Position + 40) % 40;
+        RecordMovement(p.Position, steps == 0 ? 40 : steps);
         if (target <= p.Position) Credit(p, Settings.GoPayment, "GO", "VIA");
         p.Position = target;
         rentMultiplier = multiplier;
@@ -280,6 +304,7 @@ public sealed partial class Engine
 
     private void Land(Player p)
     {
+        pendingLandingPlayer = p.Id;
         var s = Board.Squares[p.Position];
         Note($"{p.Name} lands on {s.En}.", $"{p.Name} arriva su {s.It}.");
         switch (s.Type)
@@ -300,14 +325,44 @@ public sealed partial class Engine
 
     private void SendToJail(Player p)
     {
+        pendingLandingPlayer = p.Id;
+        if (movementPath.Count == 0) movementPath.Add(p.Position);
+        movementPath.Add(10);
         p.Position = 10; p.InJail = Settings.Jail; p.JailAttempts = 0; extraRoll = false; Doubles = 0;
         Note($"{p.Name} moves to jail.", $"{p.Name} va in prigione.");
         Phase = "end";
     }
 
     private void FinishMove() { rentMultiplier = 1; Phase = "end"; }
+    private void FinishDeclinedPurchase() { FinishMove(); if (finishDeclinedTurn) EndTurn(); finishDeclinedTurn = false; }
+    private void SettleBankRent(Deed d)
+    {
+        var s = Square(d);
+        var amount = s.Type == "utility" ? (Roll!.Die1 + Roll.Die2) * (rentMultiplier == 10 ? 10 : 4) * Settings.Scale
+            : s.Rents![0] * Settings.Scale * rentMultiplier;
+        Charge([new(Active!.Id, null, amount, "Bank rent / Affitto alla banca")], FinishDeclinedPurchase);
+    }
+    private void RecordMovement(int from, int steps)
+    {
+        if (movementPath.Count == 0) movementPath.Add(from);
+        for (var i = 1; i <= Math.Abs(steps); i++) movementPath.Add((from + Math.Sign(steps) * i + 40) % 40);
+    }
+    private bool ShowPendingLanding(DateTimeOffset now)
+    {
+        if (pendingLandingPlayer == null || Phase == "rolling") return false;
+        var p = Find(pendingLandingPlayer);
+        pendingLandingPlayer = null;
+        if (Phase == "finished" || p.Bankrupt) { movementPath.Clear(); return false; }
+        var plain = Phase == "end" && Board.Squares[p.Position].Type is "go" or "jail" or "parking";
+        var path = movementPath.ToArray();
+        movementPath.Clear();
+        var arrived = now.AddMilliseconds(Math.Max(0, path.Length - 1) * 200);
+        Landing = new(p.Id, p.Position, now, path, arrived, arrived.AddSeconds(2), arrived.AddSeconds(plain ? 3 : 2), plain, extraRoll);
+        return true;
+    }
     private void EndTurn()
     {
+        Landing = null;
         Trade = null;
         if (extraRoll && !Active!.Bankrupt) { Phase = "ready"; extraRoll = false; return; }
         Doubles = 0; extraRoll = false;
@@ -337,6 +392,7 @@ public sealed partial class Engine
     private void SettleRent()
     {
         var d = Deed(Active!.Position);
+        if (d.OwnerId == null && Settings.BankRent) { SettleBankRent(d); return; }
         var amount = Rent(d);
         Charge(amount == 0 ? [] : [new(Active.Id, d.OwnerId, amount, "Rent / Affitto")], FinishMove);
     }

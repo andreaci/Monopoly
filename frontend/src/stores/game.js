@@ -14,7 +14,7 @@ export const useGame = defineStore('game', () => {
   const language = ref(null)
   const t = key => translate(language.value ?? state.value?.settings.language, key)
   const money = amount => `${state.value?.settings.currency ?? '$'}${new Intl.NumberFormat(state.value?.settings.italian ? 'it-IT' : 'en-US').format(amount ?? 0)}`
-  const can = type => online.value && !busy.value && actions.value.includes(type)
+  const can = type => online.value && !busy.value && !state.value?.landing && actions.value.includes(type)
   const player = id => state.value?.players.find(p => p.id === id)
   const square = id => state.value?.board.find(s => s.id === id)
   const deed = id => state.value?.deeds.find(d => d.squareId === id)
@@ -45,7 +45,7 @@ export const useGame = defineStore('game', () => {
     hub.onclose(() => { online.value = false; if (!stopped) retryTimer = setTimeout(() => connect().catch(e => error.value = e.message), 3000) })
     try { await hub.start(); online.value = true; await refresh() }
     catch (e) { online.value = false; error.value = e.message; if (!stopped) retryTimer = setTimeout(() => connect().catch(e => error.value = e.message), 3000) }
-    if (!clockTimer) clockTimer = setInterval(() => clock.value = Date.now() + offset, 100)
+    if (!clockTimer) clockTimer = setInterval(() => clock.value = Date.now() + offset, 50)
   }
   async function reconnectIdentity() { stopped = true; clearTimeout(retryTimer); await hub?.stop(); await connect() }
   async function run(operation) {

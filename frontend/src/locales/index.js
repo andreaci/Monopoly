@@ -7,6 +7,9 @@ const it = {
 en.sellGroup = 'Sell all buildings in this color group'
 it.sellGroup = 'Vendi tutti gli edifici del gruppo colore'
 Object.assign(en, {
+  declinePayRent:'Pay rent and end turn', declineEndTurn:'Don’t buy, end turn', cannotAffordProperty:'You don’t have enough money to buy this property.',
+  showOwners:'Show owners', zoomIn:'Zoom in', zoomOut:'Zoom out', bankRent:'Rent on bank-owned properties', bankRentHelp:'Pay rent to the bank only if you decline to buy an unowned property. Streets and railways use base rent; utilities use the dice total.',
+  landedAt:'Landed on', newLocation:'New location', turnFinished:'Turn finished', rollAgain:'Doubles — roll again', rollPrompt:'It’s your turn',
   managedTable:'This table is managed by the browser that created it. You can create your own table from anywhere.',
   localMultiplayer:'Play with your friends, 2–6 players', qrCode:'Match QR code', continue:'Continue', newMatch:'New table', metalTokens:'Metal tokens', woodTokens:'Painted wooden tokens',
   auctionsHelp:'When you land on another player’s street, propose a sale. The owner can refuse; everyone can bid. Rent is paid after the auction.',
@@ -16,6 +19,9 @@ Object.assign(en, {
   mortgagesHelp:'Mortgage undeveloped property for cash. No rent is collected until it is redeemed with interest.'
 })
 Object.assign(it, {
+  declinePayRent:'Paga l’affitto e termina il turno', declineEndTurn:'Non comprare, termina il turno', cannotAffordProperty:'Non hai abbastanza denaro per comprare questa proprietà.',
+  showOwners:'Mostra proprietari', zoomIn:'Ingrandisci', zoomOut:'Riduci', bankRent:'Affitto sulle proprietà della banca', bankRentHelp:'Paga l’affitto alla banca solo se scegli di non comprare una proprietà libera. Strade e stazioni usano l’affitto base; le società usano il totale dei dadi.',
+  landedAt:'Arrivo su', newLocation:'Nuova posizione', turnFinished:'Turno terminato', rollAgain:'Doppio — lancia ancora', rollPrompt:'È il tuo turno',
   managedTable:'Questo tavolo è gestito dal browser che lo ha creato. Puoi creare il tuo tavolo da qualsiasi luogo.',
   localMultiplayer:'Gioca con i tuoi amici, 2–6 giocatori', qrCode:'Codice QR della partita', continue:'Continua', newMatch:'Nuovo tavolo', metalTokens:'Pedine in metallo', woodTokens:'Pedine in legno dipinto',
   auctionsHelp:'Quando arrivi sulla strada di un altro giocatore, proponi una vendita. Il proprietario può rifiutare; tutti possono fare offerte. L’affitto si paga dopo l’asta.',

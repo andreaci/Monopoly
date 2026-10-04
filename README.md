@@ -56,6 +56,10 @@ Each new table gets an opaque match ID. Its API requests, WebSocket group and pl
 
 Phone card draws appear as animated fullscreen cards with a Continue button. Consecutive draws are queued, and dismissed cards are remembered for the browser tab. Tokens include both metal-style figurines and painted wooden pieces based on the supplied references.
 
+Tokens hop through the server-provided route, then every screen shows the final location in a green overlay. On GO, Just Visiting/Jail and Free Parking, the location is shown for two seconds followed by a one-second turn-finished announcement before advancing automatically. Doubles retain their extra roll. The active player's phone shows a small Roll Dice prompt and fullscreen purchase decisions with two large buttons. Declining a property finishes the turn (or grants the extra roll); insufficient funds for bank rent require debt settlement first.
+
+Board zoom resizes the HTML/CSS board so labels and SVG tokens render at the enlarged resolution. Tokens have contrasting badges and player colors. The manager board's **Show owners** checkbox adds token/name labels in property bands, including bank labels for unsold deeds.
+
 The whole interface uses the device’s standard system sans-serif font, including headings, board labels and cards. No custom fonts or font downloads are required.
 
 [`.github/workflows/docker.yml`](.github/workflows/docker.yml) runs only when a version tag in the form `vX.X.X` is pushed, such as `v1.2.3` or `v10.20.30`. It runs the engine checks, builds the full Docker image with Buildx caching using the default `/monopoly/` base path, starts the image, and verifies both the API and frontend routes. After those checks pass, it publishes the same image to **GitHub Container Registry** as `ghcr.io/<owner>/<repository>:<version-tag>` (repository names are lowercased), and also uploads the image archive as an artifact. The workflow authenticates with GitHub's built-in `GITHUB_TOKEN` and `packages: write`; no extra registry secret is required.
@@ -101,8 +105,9 @@ Vite listens on the LAN and proxies `/api` and `/hubs` to port 5080. Open the fr
 
 - Server-authoritative turns, cryptographic dice/shuffling, duplicate command IDs, money transfers, 40 squares, and all 28 deeds.
 - English US uses $1,500 / $200 defaults; Italian euro uses €1,500 / €200; Italian classic pound uses £150,000 / £20,000. Deeds, taxes, repairs, and card amounts scale by 100 in the classic profile. Setup overrides affect starting cash and GO/VIA only.
-- Auctions, trading, buildings, jail, and mortgages can be enabled independently. Bankruptcy is always enabled. Settings lock on start. Joining order determines turns.
+- Auctions, trading, buildings, jail, mortgages, and rent on bank-owned properties can be enabled independently. Bankruptcy is always enabled. Settings lock on start. Joining order determines turns.
 - Unowned property can be purchased directly or left in the bank. There is no bank auction when a purchase is declined.
+- Bank rent is disabled by default. When enabled, it is charged only when the player declines to buy: base street/railway rent, or dice-based utility rent, with applicable movement-card multipliers. Buying the property incurs no bank rent.
 - Landing on another player's undeveloped colored street allows a purchase proposal. The owner may refuse. Acceptance opens a 25-second auction for everyone, including owner and visitor. The owner sets its opening price. Late bids extend to at least 8 seconds. Bids cannot exceed cash.
 - A winning bid transfers cash and the deed together. If the owner wins or nobody bids, ownership stays unchanged. The visitor then pays rent to the resulting owner unless they own it. Developed groups must have all buildings sold before auction or trade. Railways/utilities are traded rather than landing-auctioned. Mortgaged deeds charge no rent.
 - Trading requires consent, can include cash/deeds/jail cards, and locks the initiating player's other actions until answered or canceled. Recipients of mortgaged deeds pay 10% of the mortgage principal immediately and retain the mortgage; redemption later pays principal plus 10% again.

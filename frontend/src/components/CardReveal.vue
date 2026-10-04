@@ -15,7 +15,7 @@ watch(() => game.state, state => {
     seen = Math.max(seen, event.sequence)
   }
 }, { immediate: true })
-const current = computed(() => game.state?.phase === 'rolling' ? null : queue.value[0])
+const current = computed(() => game.state?.phase === 'rolling' || game.state?.landing ? null : queue.value[0])
 function dismiss() {
   const event = queue.value.shift()
   sessionStorage.setItem(`cards:${matchId}:${game.meId}`, String(event.sequence))
