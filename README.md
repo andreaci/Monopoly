@@ -58,7 +58,16 @@ Phone card draws appear as animated fullscreen cards with a Continue button. Con
 
 The locally bundled font is the **Monopoly Inline demo** from the requested [Monopoly Sans source](https://www.dafontfree.io/monopoly-sans-font/), which labels it personal use only. See `frontend/public/fonts/README.md`.
 
-[`.github/workflows/docker.yml`](.github/workflows/docker.yml) runs only when a version tag in the form `vX.X.X` is pushed, such as `v1.2.3` or `v10.20.30`. It runs the engine checks, builds the full Docker image with Buildx caching using the default `/monopoly/` base path, starts the image, verifies both the API and frontend routes, and uploads the image archive as an artifact. No registry credentials are required.
+[`.github/workflows/docker.yml`](.github/workflows/docker.yml) runs only when a version tag in the form `vX.X.X` is pushed, such as `v1.2.3` or `v10.20.30`. It runs the engine checks, builds the full Docker image with Buildx caching using the default `/monopoly/` base path, starts the image, and verifies both the API and frontend routes. After those checks pass, it publishes the same image to **GitHub Container Registry** as `ghcr.io/<owner>/<repository>:<version-tag>` (repository names are lowercased), and also uploads the image archive as an artifact. The workflow authenticates with GitHub's built-in `GITHUB_TOKEN` and `packages: write`; no extra registry secret is required.
+
+For this repository, a `v1.2.3` tag publishes `ghcr.io/andreaci/monopoly:v1.2.3`:
+
+```powershell
+docker pull ghcr.io/andreaci/monopoly:v1.2.3
+docker run --rm -p 5080:5080 ghcr.io/andreaci/monopoly:v1.2.3
+```
+
+Open `http://localhost:5080/monopoly/`. New GHCR packages are private by default; set the package visibility to public in GitHub if you want unauthenticated pulls, or authenticate to pull a private package.
 
 Download and unzip the `monopoly-container` artifact, then:
 
