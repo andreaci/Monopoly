@@ -35,7 +35,7 @@ docker build -t monopoly .
 docker run --name monopoly --rm -p 5080:5080 monopoly
 ```
 
-The multi-stage Dockerfile compiles Vue and .NET 10, then runs only the ASP.NET runtime and built static frontend. It runs as the image's non-root app user. The backend serves the frontend on port 5080.
+The multi-stage Dockerfile compiles Vue and .NET 10, then runs only the ASP.NET runtime and built static frontend. It runs as the image's non-root app user. The backend serves the frontend on port 5080 under **`/monopoly/` by default**. Open `http://localhost:5080/monopoly/`. To build for root hosting, use `docker build --build-arg APP_BASE_PATH=/ -t monopoly .`.
 
 In Docker, enter the **manager access code printed in the container logs** on the setup page. A container does not see the host browser as a loopback connection. Only the manager session can change settings or start the game. The code is newly generated each server start.
 
@@ -50,7 +50,7 @@ Open the manager page using the intended player-facing URL, for example `https:/
 docker build --build-arg APP_BASE_PATH=/monopoly/ -t monopoly .
 ```
 
-Keep `/monopoly/` in the upstream request path, enable WebSocket upgrades, and preserve the public Host header. Configure `TRUSTED_PROXIES` with a comma-separated list of proxy IPs when forwarding `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For`; loopback proxies are trusted by default. Set `ALLOW_LOCAL_MANAGER=false` for public proxy deployments so setup always requires the manager code. TLS can terminate at the proxy. Frontend and backend base paths must agree. Root hosting remains the default.
+Keep `/monopoly/` in the upstream request path, enable WebSocket upgrades, and preserve the public Host header. Configure `TRUSTED_PROXIES` with a comma-separated list of proxy IPs when forwarding `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For`; loopback proxies are trusted by default. Set `ALLOW_LOCAL_MANAGER=false` for public proxy deployments so setup always requires the manager code. TLS can terminate at the proxy. Frontend and backend base paths must agree. Windows publishing defaults to root hosting; Docker defaults to `/monopoly/`.
 
 Each new table gets an opaque match ID. Its API requests, WebSocket group and player/manager cookies are isolated from other tables. Refreshing a match URL rejoins that table; **New table** creates a separate match while existing tables continue running. Keep the full match link when opening `/play` or `/display`.
 
@@ -58,9 +58,9 @@ Phone card draws appear as animated fullscreen cards with a Continue button. Con
 
 The locally bundled font is the **Monopoly Inline demo** from the requested [Monopoly Sans source](https://www.dafontfree.io/monopoly-sans-font/), which labels it personal use only. See `frontend/public/fonts/README.md`.
 
-[`.github/workflows/docker.yml`](.github/workflows/docker.yml) runs on pull requests, pushes to `main`/`master`, and manual dispatch. It runs the engine checks, builds the full Docker image with Buildx caching, starts the image, verifies both the API and frontend routes, and uploads the image archive as an artifact. No registry credentials are required.
+[`.github/workflows/docker.yml`](.github/workflows/docker.yml) runs only when a version tag in the form `vX.X.X` is pushed, such as `v1.2.3` or `v10.20.30`. It runs the engine checks, builds the full Docker image with Buildx caching using the default `/monopoly/` base path, starts the image, verifies both the API and frontend routes, and uploads the image archive as an artifact. No registry credentials are required.
 
-Download and unzip the `monopoly-container-root` or `monopoly-container-subfolder` artifact, then:
+Download and unzip the `monopoly-container` artifact, then:
 
 ```powershell
 docker load -i monopoly-image.tar
