@@ -22,7 +22,7 @@ For this workspace's initial verification, ASP.NET Core 10 was installed into th
 
 Use a normal system installation of the ASP.NET Core 10 runtime for ongoing development or deployment.
 
-Open **http://localhost:5080** on the manager's PC. Choose the language, amounts, and optional rules. The QR uses the address where the page was opened and includes `?match=<match-id>`. Open the manager page using an address your players can reach (a LAN address or public proxy URL). Players scan it, choose a name/token, and wait in the lobby. Start when 2–6 players are connected.
+Open the application from any browser using its public URL (or a LAN address for local hosting). Choose the language, amounts, and optional rules. The QR uses the address where the page was opened and includes `?match=<match-id>`. Open the manager page using an address your players can reach (a LAN address or public proxy URL). Players scan it, choose a name/token, and wait in the lobby. Start when 2–6 players are connected.
 
 The PC becomes the main display. Players roll, buy, trade, bid, manage properties, and end turns from `/play` on their phones. `/display` is an additional viewing route. The app and its assets need no Internet connection while playing. Windows may need an inbound firewall allowance for TCP 5080 on the local network.
 
@@ -37,7 +37,7 @@ docker run --name monopoly --rm -p 5080:5080 monopoly
 
 The multi-stage Dockerfile compiles Vue and .NET 10, then runs only the ASP.NET runtime and built static frontend. It runs as the image's non-root app user. The backend serves the frontend on port 5080 under **`/monopoly/` by default**. Open `http://localhost:5080/monopoly/`. To build for root hosting, use `docker build --build-arg APP_BASE_PATH=/ -t monopoly .`.
 
-In Docker, enter the **manager access code printed in the container logs** on the setup page. A container does not see the host browser as a loopback connection. Only the manager session can change settings or start the game. The code is newly generated each server start.
+Opening the application without a match ID creates a table and automatically gives that browser its manager cookie. This works from any location, including through the public reverse proxy. No access code or localhost connection is required. The creating browser can configure and start its table; a shared match link does not grant manager rights.
 
 Open the manager page using the intended player-facing URL, for example `https://games.example.com/monopoly/`. The QR derives its origin, port and base path from that page; it never lists host interfaces.
 
@@ -50,13 +50,13 @@ Open the manager page using the intended player-facing URL, for example `https:/
 docker build --build-arg APP_BASE_PATH=/monopoly/ -t monopoly .
 ```
 
-Keep `/monopoly/` in the upstream request path and enable WebSocket upgrades. As in SeguiLaFolla, the backend does not reject requests because the browser Origin differs from the upstream Host. Forwarded headers are accepted from all proxies, including proxy chains; no `TRUSTED_PROXIES` configuration is required. When supplied, `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For` restore the public request information. Set `ALLOW_LOCAL_MANAGER=false` for public proxy deployments so setup always requires the manager code. TLS can terminate at the proxy. Frontend and backend base paths must agree. Windows publishing defaults to root hosting; Docker defaults to `/monopoly/`.
+Keep `/monopoly/` in the upstream request path and enable WebSocket upgrades. As in SeguiLaFolla, the backend does not reject requests because the browser Origin differs from the upstream Host. Forwarded headers are accepted from all proxies, including proxy chains; no `TRUSTED_PROXIES` configuration is required. When supplied, `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For` restore the public request information. TLS can terminate at the proxy. Frontend and backend base paths must agree. Windows publishing defaults to root hosting; Docker defaults to `/monopoly/`.
 
 Each new table gets an opaque match ID. Its API requests, WebSocket group and player/manager cookies are isolated from other tables. Refreshing a match URL rejoins that table; **New table** creates a separate match while existing tables continue running. Keep the full match link when opening `/play` or `/display`.
 
 Phone card draws appear as animated fullscreen cards with a Continue button. Consecutive draws are queued, and dismissed cards are remembered for the browser tab. Tokens include both metal-style figurines and painted wooden pieces based on the supplied references.
 
-The locally bundled font is the **Monopoly Inline demo** from the requested [Monopoly Sans source](https://www.dafontfree.io/monopoly-sans-font/), which labels it personal use only. See `frontend/public/fonts/README.md`.
+The locally bundled **Monopoly Regular and Bold** fonts by Hyunseok Choi replace the outlined font. The designer provides them free for personal and commercial use. See `frontend/public/fonts/README.md` for the source and included readme.
 
 [`.github/workflows/docker.yml`](.github/workflows/docker.yml) runs only when a version tag in the form `vX.X.X` is pushed, such as `v1.2.3` or `v10.20.30`. It runs the engine checks, builds the full Docker image with Buildx caching using the default `/monopoly/` base path, starts the image, and verifies both the API and frontend routes. After those checks pass, it publishes the same image to **GitHub Container Registry** as `ghcr.io/<owner>/<repository>:<version-tag>` (repository names are lowercased), and also uploads the image archive as an artifact. The workflow authenticates with GitHub's built-in `GITHUB_TOKEN` and `packages: write`; no extra registry secret is required.
 

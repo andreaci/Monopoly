@@ -1,4 +1,3 @@
-using System.Net;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.HttpOverrides;
 using Monopoly.Server.Domain;
@@ -44,22 +43,15 @@ app.UseStaticFiles();
 // Otherwise WebApplication's implicit routing matches /monopoly/api/... to the SPA fallback.
 app.UseRouting();
 
-bool IsManager(HttpContext context, MatchService match) => context.Request.Cookies[match.ManagerCookie] == match.ManagerSecret;
+bool IsManager(HttpContext context, MatchService match) => context.Request.Cookies[match.ManagerCookie] == match.ManagerToken;
 
 app.MapGet("/api/session", (HttpContext context, MatchService match) =>
 {
     var playerId = match.Identify(context.Request.Cookies[match.PlayerCookie]);
-    return Results.Ok(new { playerId, manager = IsManager(context, match), state = match.Snapshot(playerId) });
-});
-app.MapPost("/api/manager", (HttpContext context, MatchService match) =>
-{
-    var local = builder.Configuration["ALLOW_LOCAL_MANAGER"] != "false" &&
-        context.Connection.RemoteIpAddress is { } remote && IPAddress.IsLoopback(remote) &&
-        (context.Request.Host.Host is "localhost" or "127.0.0.1" or "[::1]") &&
-        !context.Request.Headers.ContainsKey("X-Forwarded-For") && !context.Request.Headers.ContainsKey("X-Forwarded-Host");
-    if (!local && context.Request.Headers["X-Manager-Key"] != match.ManagerSecret) return Results.StatusCode(403);
-    context.Response.Cookies.Append(match.ManagerCookie, match.ManagerSecret, new() { HttpOnly = true, SameSite = SameSiteMode.Strict, IsEssential = true, Secure = context.Request.IsHttps, Path = context.Request.PathBase.HasValue ? context.Request.PathBase.Value + "/" : "/" });
-    return Results.Ok();
+    var created = string.IsNullOrEmpty(context.Request.Query["match"]);
+    if (created)
+        context.Response.Cookies.Append(match.ManagerCookie, match.ManagerToken, new() { HttpOnly = true, SameSite = SameSiteMode.Strict, IsEssential = true, Secure = context.Request.IsHttps, Path = context.Request.PathBase.HasValue ? context.Request.PathBase.Value + "/" : "/" });
+    return Results.Ok(new { playerId, manager = created || IsManager(context, match), state = match.Snapshot(playerId) });
 });
 app.MapPost("/api/settings", async (Settings settings, HttpContext context, MatchService match, IHubContext<GameHub> hub) =>
 {
@@ -81,7 +73,6 @@ app.MapPost("/api/join", (JoinRequest request, HttpContext context, MatchService
 });
 app.MapHub<GameHub>("/hubs/game", options => options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets);
 app.MapFallbackToFile("index.html");
-app.Logger.LogInformation("Manager access code (Docker): {Code}", app.Services.GetRequiredService<MatchRegistry>().ManagerSecret);
 app.Run();
 
 public sealed record JoinRequest(string Name, string Token);

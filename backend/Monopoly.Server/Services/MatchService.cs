@@ -4,13 +4,13 @@ using Monopoly.Server.GameEngine;
 namespace Monopoly.Server.Services;
 
 // One lock protects commands, sessions, presence and timer transitions together.
-public sealed class MatchService(string? managerSecret = null)
+public sealed class MatchService
 {
     private readonly object gate = new();
     private readonly Engine engine = new();
     private readonly Dictionary<string, string> sessions = [];
     private readonly Dictionary<string, string?> connections = [];
-    public string ManagerSecret { get; } = managerSecret ?? Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+    public string ManagerToken { get; } = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
     public string Id => engine.MatchId;
     public string PlayerCookie => $"monopoly_player_{Id}";
     public string ManagerCookie => $"monopoly_manager_{Id}";

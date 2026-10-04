@@ -1,7 +1,9 @@
-# Monopoly Inline
+# Monopoly Regular and Bold
 
-`MONOPOLY_INLINE.ttf` is the demo font requested for this school exercise.
+Solid Monopoly Regular and Bold by Hyunseok Choi, bundled locally for readable UI text and headings.
 
-Source: https://www.dafontfree.io/monopoly-sans-font/
+Designer source: https://www.behance.net/gallery/34145219/Monopoly-Free-Font
 
-The source labels this demo **personal use only** and links to the full commercial version. The downloaded archive contains only the Inline style. It is bundled locally so the application does not depend on a font service.
+Download: https://www.dafont.com/monopoly.font
+
+The designer permits personal and commercial use without contacting them. `AUTHOR-README.txt` is the readme supplied with the download. The fonts contain basic Latin characters; unsupported characters use the system sans-serif fallback.

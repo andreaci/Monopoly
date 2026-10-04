@@ -13,7 +13,7 @@ import TokenIcon from './components/TokenIcon.vue'
 const game = useGame(), route = useRoute(), router = useRouter()
 const baseUrl = import.meta.env.BASE_URL
 const form = ref({language:'en',startingCash:1500,goPayment:200,auctions:true,trading:true,buildings:true,jail:true,mortgages:true})
-const joinUrl = ref(''), qr = ref(''), copied = ref(false), managerKey = ref('')
+const joinUrl = ref(''), qr = ref(''), copied = ref(false)
 const joinName = ref(''), joinToken = ref(''), selected = ref(null), expanded = ref(false), selectedDeed = ref(''), bidAmount = ref(1), opening = ref(1), tradeOpen = ref(false)
 const tradeDraft = ref({ to:'',offerCash:0,requestCash:0,offerDeeds:[],requestDeeds:[],offerJailCards:0,requestJailCards:0 })
 const phone = computed(()=>route.path === '/join' || route.path === '/play')
@@ -49,17 +49,10 @@ onMounted(async ()=>{
     form.value = { ...game.state.settings }
     await new Promise(resolve=>queueMicrotask(resolve))
     loadingSettings = false
-    if(!phone.value && route.path!=='/display' && !game.manager) {
-      // Native hosting can authorize localhost automatically. Docker asks for its log code.
-      await fetch(game.url('api/manager'),{method:'POST'}).then(r=>{ if(r.ok) game.manager=true })
-    }
     joinUrl.value = `${location.origin}${baseUrl}join?match=${game.state.matchId}`
     if(game.me && route.path==='/join') router.replace({path:'/play',query:{match:game.state.matchId}})
   } catch(e) { game.error=e.message }
 })
-async function unlock() {
-  await game.run(async ()=>{ const response=await fetch(game.url('api/manager'),{method:'POST',headers:{'X-Manager-Key':managerKey.value}}); if(!response.ok) throw new Error(game.t('managerHint')); game.manager=true; managerKey.value='' })
-}
 async function save(start=false) {
   await game.run(async ()=>{ await game.request('settings',form.value); if(start) await game.request('start',{}); })
 }
@@ -91,7 +84,7 @@ async function bankrupt() { if(window.confirm(game.t('bankruptConfirm'))) await 
           <h3>{{ game.t('rules') }}</h3><div class="rule-options"><label v-for="key in ['auctions','trading','buildings','jail','mortgages']" :key="key" class="checkbox"><input v-model="form[key]" type="checkbox"><span><strong>{{ game.t(key) }}</strong><small class="rule-description">{{ game.t(key+'Help') }}</small></span></label></div>
           <p class="fineprint">{{ game.t('rulesHint') }}</p><div class="button-row"><button :disabled="game.busy || !game.online" @click="save()">{{ game.t('save') }}</button><button class="primary" :disabled="!startReady" @click="save(true)">{{ game.t('start') }} →</button></div><p class="fineprint">{{ game.t('allReady') }}</p>
         </template>
-        <template v-else><p>{{ game.t('managerHint') }}</p><label>{{ game.t('managerKey') }}<input v-model="managerKey" type="password" autocomplete="off"></label><button class="primary" :disabled="game.busy" @click="unlock">{{ game.t('unlock') }}</button></template>
+        <template v-else><p>{{ game.t('managedTable') }}</p><a :href="baseUrl">{{ game.t('newMatch') }}</a></template>
       </div>
       <div class="lobby-column"><div class="panel qr-panel"><span class="eyebrow">{{ game.t('join') }}</span><img v-if="qr" :src="qr" tabindex="0" :alt="game.t('qrCode')" class="qr-image"><label>{{ game.t('lan') }}<input :value="joinUrl" type="url" readonly></label><button :disabled="!qr" @click="copy">{{ game.t(copied?'copied':'copy') }}</button></div>
         <div class="panel"><h3>{{ game.t('players') }} <span class="count">{{ game.state.players.length }}/6</span></h3><div v-for="p in game.state.players" :key="p.id" class="lobby-player"><span class="token-avatar"><TokenIcon :token="p.token" /></span><strong>{{ p.name }}</strong><span class="status" :class="{present:p.connected}">{{ game.t(p.connected?'connected':'disconnected') }}</span></div><p v-if="!game.state.players.length" class="muted">{{ game.t('waiting') }}…</p></div>
