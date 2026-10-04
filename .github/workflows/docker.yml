@@ -1,0 +1,64 @@
+name: Build Monopoly container
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - profile: root
+            basePath: /
+            prefix: ''
+          - profile: subfolder
+            basePath: /monopoly/
+            prefix: /monopoly
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify game rules
+        run: dotnet run --project tests/Monopoly.GameEngine.Tests -c Release
+      - uses: docker/setup-buildx-action@v3
+      - name: Build frontend and backend container
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: monopoly:ci
+          build-args: APP_BASE_PATH=${{ matrix.basePath }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Check static frontend and API
+        shell: bash
+        run: |
+          docker run -d --name monopoly-ci -p 5080:5080 monopoly:ci
+          trap 'docker logs monopoly-ci; docker rm -f monopoly-ci' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://localhost:5080${{ matrix.prefix }}/api/session > /tmp/session.json; then break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:5080${{ matrix.prefix }}/ | grep -q '<div id="app">'
+          curl -fsS http://localhost:5080${{ matrix.prefix }}/join | grep -q '<div id="app">'
+          python3 -c 'import json; s=json.load(open("/tmp/session.json")); assert s["state"]["phase"] == "lobby"; assert len(s["state"]["board"]) == 40'
+      - name: Export the runnable image
+        run: docker save -o monopoly-image.tar monopoly:ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: monopoly-container-${{ matrix.profile }}
+          path: monopoly-image.tar
+          retention-days: 7

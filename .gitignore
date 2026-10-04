@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+frontend/node_modules/
+frontend/dist/
+backend/Monopoly.Server/wwwroot/
+published/
+.npm-cache/
+.dotnet-local/
+.tools/
+*.log

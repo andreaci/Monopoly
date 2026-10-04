@@ -1,0 +1,12 @@
+.git
+.github
+.npm-cache
+.dotnet-local
+.tools
+**/node_modules
+**/dist
+**/bin
+**/obj
+published
+tests
+*.log
