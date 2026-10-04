@@ -7,6 +7,7 @@ const it = {
 en.sellGroup = 'Sell all buildings in this color group'
 it.sellGroup = 'Vendi tutti gli edifici del gruppo colore'
 Object.assign(en, {
+  offerToBuy:'Offer to buy',
   declinePayRent:'Pay rent and end turn', declineEndTurn:'Don’t buy, end turn', cannotAffordProperty:'You don’t have enough money to buy this property.',
   showOwners:'Show owners', zoomIn:'Zoom in', zoomOut:'Zoom out', bankRent:'Rent on bank-owned properties', bankRentHelp:'Pay rent to the bank only if you decline to buy an unowned property. Streets and railways use base rent; utilities use the dice total.',
   landedAt:'Landed on', newLocation:'New location', turnFinished:'Turn finished', rollAgain:'Doubles — roll again', rollPrompt:'It’s your turn',
@@ -19,6 +20,7 @@ Object.assign(en, {
   mortgagesHelp:'Mortgage undeveloped property for cash. No rent is collected until it is redeemed with interest.'
 })
 Object.assign(it, {
+  offerToBuy:'Proponi l’acquisto',
   declinePayRent:'Paga l’affitto e termina il turno', declineEndTurn:'Non comprare, termina il turno', cannotAffordProperty:'Non hai abbastanza denaro per comprare questa proprietà.',
   showOwners:'Mostra proprietari', zoomIn:'Ingrandisci', zoomOut:'Riduci', bankRent:'Affitto sulle proprietà della banca', bankRentHelp:'Paga l’affitto alla banca solo se scegli di non comprare una proprietà libera. Strade e stazioni usano l’affitto base; le società usano il totale dei dadi.',
   landedAt:'Arrivo su', newLocation:'Nuova posizione', turnFinished:'Turno terminato', rollAgain:'Doppio — lancia ancora', rollPrompt:'È il tuo turno',
