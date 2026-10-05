@@ -1,11 +1,28 @@
 <script setup>
-import { ref, onBeforeUnmount } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import Board2D from './Board2D.vue'
 import { useGame } from '../stores/game'
-defineProps({ compact:Boolean, ownershipToggle:Boolean })
+const props = defineProps({ compact:Boolean, ownershipToggle:Boolean, fit:Boolean })
 const emit = defineEmits(['select','expand'])
 const game = useGame(), scale = ref(1), x = ref(0), y = ref(0)
 const showOwners = ref(false)
+const viewport = ref(null), controls = ref(null), fitWidth = ref(null)
+let fitObserver
+function fitBoard() {
+  if (!props.fit || !viewport.value || !controls.value) return
+  if (!window.matchMedia('(min-width:901px)').matches) { fitWidth.value = null; return }
+  const parent = viewport.value.parentElement
+  const margin = parseFloat(getComputedStyle(controls.value).marginBottom) || 0
+  fitWidth.value = Math.max(0, Math.floor(Math.min(parent.clientWidth, parent.clientHeight - controls.value.offsetHeight - margin) - 2))
+}
+watch([viewport, controls, () => props.fit], () => {
+  fitObserver?.disconnect()
+  if (!props.fit || !viewport.value || !controls.value) return
+  fitObserver = new ResizeObserver(fitBoard)
+  fitObserver.observe(viewport.value.parentElement)
+  fitObserver.observe(controls.value)
+  fitBoard()
+})
 const pointers = new Map()
 let lastDistance = 0, lastCenter, moved = false
 function reset() { scale.value=1; x.value=0; y.value=0 }
@@ -25,11 +42,11 @@ function move(e) {
 function up(e) { pointers.delete(e.pointerId);lastDistance=0;lastCenter=null }
 function selected(square) { if(!moved) emit('select',square) }
 window.addEventListener('pointerup',up)
-onBeforeUnmount(()=>window.removeEventListener('pointerup',up))
+onBeforeUnmount(()=>{ window.removeEventListener('pointerup',up); fitObserver?.disconnect() })
 </script>
 <template>
-  <div class="board-viewport" :class="{compact}">
-    <div class="board-controls"><label v-if="ownershipToggle" class="owner-toggle"><input v-model="showOwners" type="checkbox">{{ game.t('showOwners') }}</label><button @click="zoom(scale-.25)" :aria-label="game.t('zoomOut')">−</button><button @click="reset">{{ game.t('reset') }}</button><button @click="zoom(scale+.25)" :aria-label="game.t('zoomIn')">+</button><button v-if="compact" @click="$emit('expand')" :aria-label="game.t('zoom')">⤢</button></div>
+  <div ref="viewport" class="board-viewport" :class="{compact}" :style="{width:fitWidth == null ? undefined : `${fitWidth}px`}">
+    <div ref="controls" class="board-controls"><label v-if="ownershipToggle" class="owner-toggle"><input v-model="showOwners" type="checkbox">{{ game.t('showOwners') }}</label><button @click="zoom(scale-.25)" :aria-label="game.t('zoomOut')">−</button><button @click="reset">{{ game.t('reset') }}</button><button @click="zoom(scale+.25)" :aria-label="game.t('zoomIn')">+</button><button v-if="compact" @click="$emit('expand')" :aria-label="game.t('zoom')">⤢</button></div>
     <div class="board-clip" @wheel.prevent="zoom(scale + ($event.deltaY < 0 ? .15 : -.15))" @pointerdown="down" @pointermove="move" @pointercancel="up">
       <div class="board-transform" :style="{position:'absolute',width:`${scale*100}%`,height:`${scale*100}%`,left:`calc(50% + ${x}px)`,top:`calc(50% + ${y}px)`,transform:'translate(-50%,-50%)'}"><Board2D :show-owners="showOwners" @select="selected" /></div>
     </div>

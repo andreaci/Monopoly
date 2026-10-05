@@ -58,6 +58,7 @@ public sealed partial class Engine
         {
             var buyer = Find(a.BidderId); var owner = Find(a.OwnerId);
             buyer.Cash -= a.HighestBid; owner.Cash = checked(owner.Cash + a.HighestBid);
+            RecordPlayerPayment(buyer, owner, a.HighestBid);
             AddMoneyEvent(buyer.Id, -a.HighestBid); AddMoneyEvent(owner.Id, a.HighestBid); d.OwnerId = buyer.Id;
             if (d.Mortgaged) fees.Add(new(buyer.Id, null, Square(d).Price * Settings.Scale / 20, "Mortgage transfer / Trasferimento ipoteca"));
             Note($"{buyer.Name} wins {Square(d).En} for {Money(a.HighestBid)}.", $"{buyer.Name} vince {Square(d).It} per {Money(a.HighestBid)}.");
@@ -168,6 +169,8 @@ public sealed partial class Engine
         var toChange = -t.RequestCash + t.OfferCash - TransferFee(t.OfferDeeds);
         from.Cash = checked(from.Cash + fromChange);
         to.Cash = checked(to.Cash + toChange);
+        RecordPlayerPayment(from, to, t.OfferCash);
+        RecordPlayerPayment(to, from, t.RequestCash);
         AddMoneyEvent(from.Id, -t.OfferCash);
         AddMoneyEvent(to.Id, t.OfferCash);
         AddMoneyEvent(to.Id, -t.RequestCash);
@@ -202,6 +205,7 @@ public sealed partial class Engine
         if (liquidation != 0) AddMoneyEvent(p.Id, liquidation);
         if (creditor != null)
         {
+            RecordPlayerPayment(p, creditor, p.Cash);
             if (p.Cash != 0) { AddMoneyEvent(p.Id, -p.Cash); AddMoneyEvent(creditor.Id, p.Cash); }
             creditor.Cash = checked(creditor.Cash + p.Cash); creditor.JailCards.AddRange(p.JailCards);
         }

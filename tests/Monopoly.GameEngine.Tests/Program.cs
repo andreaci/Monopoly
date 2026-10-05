@@ -25,9 +25,17 @@ static Engine Game(int count = 2, Settings? settings = null, int[]? dice = null,
     for (var i = 0; i < count; i++) { var p = engine.Join($"Player {i + 1}", Board.Tokens[i]); engine.Presence(p.Id, true); }
     engine.Start(); return engine;
 }
-static void Roll(Engine e)
+static DateTimeOffset Roll(Engine e)
 {
-    e.Execute(e.Active!.Id, Cmd("roll")); e.Tick(DateTimeOffset.UtcNow.AddSeconds(4));
+    e.Execute(e.Active!.Id, Cmd("roll"));
+    var now = e.Roll!.EndsAt;
+    e.Tick(now);
+    while (e.Phase is "card" or "utilityArrival")
+    {
+        now = e.Landing?.EndsAt ?? e.RevealingCard!.EndsAt;
+        e.Tick(now);
+    }
+    return now;
 }
 static Deed D(Engine e, int id) => e.Deeds.Single(d => d.SquareId == id);
 
@@ -152,18 +160,17 @@ Test("Italian classic monetary scale applies to purchases", () => {
 });
 Test("Nearest utility card uses a fresh server roll for rent", () => {
     var e=Game(dice:[1,2,2,3],firstCard:Cards.All.Single(c=>c.Id=="ch07")); e.Active!.Position=4; D(e,12).OwnerId=e.Players[1].Id;
-    Roll(e); Equal(e.Phase,"rolling"); Equal(e.Roll!.Utility,true); e.Tick(DateTimeOffset.UtcNow.AddSeconds(4)); Equal(e.Active.Cash,1450); Equal(e.Players[1].Cash,1550);
+    Roll(e); Equal(e.Phase,"rolling"); Equal(e.Roll!.Utility,true); e.Tick(e.Roll.EndsAt); Equal(e.Active.Cash,1450); Equal(e.Players[1].Cash,1550);
 });
 Test("Utility rent waits two seconds after resolution before advancing the turn", () => {
     var e=Game(dice:[1,2,2,3],firstCard:Cards.All.Single(c=>c.Id=="ch07"));
     var payer=e.Active!; payer.Position=4; D(e,12).OwnerId=e.Players[1].Id;
     Roll(e);
-    var resolvedAt=DateTimeOffset.UtcNow.AddSeconds(4);
+    var resolvedAt=e.Roll!.EndsAt;
     e.Tick(resolvedAt);
     Equal(payer.Cash,1450); Equal(e.Players[1].Cash,1550); Equal(e.Active!.Id,payer.Id); Equal(e.Phase,"end");
     e.Tick(resolvedAt.AddMilliseconds(1999)); Equal(e.Active!.Id,payer.Id);
-    e.Tick(resolvedAt.AddSeconds(2)); Equal(e.Active!.Id,payer.Id);
-    e.Tick(e.Landing!.EndsAt); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
+    e.Tick(resolvedAt.AddSeconds(2)); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
 });
 Test("Both complete decks have unique stable IDs", () => {
     Equal(Cards.All.Length,32); Equal(Cards.All.Select(c=>c.Id).Distinct().Count(),32);
@@ -172,15 +179,15 @@ Test("Both complete decks have unique stable IDs", () => {
 });
 Test("A completed card automatically advances after its landing display", () => {
     var e=Game(firstCard:Cards.All.Single(c=>c.Id=="ch08")); var p=e.Active!; p.Position=4;
-    Roll(e); Equal(e.Phase,"end");
-    var endsAt=e.Landing!.EndsAt;
+    var resolvedAt=Roll(e); Equal(e.Phase,"end");
+    var endsAt=resolvedAt.AddSeconds(2);
     e.Tick(endsAt.AddMilliseconds(-1)); Equal(e.Active!.Id,p.Id);
     e.Tick(endsAt); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
 });
 Test("A card waits for unpaid debt before automatically completing the turn", () => {
     var e=Game(firstCard:Cards.All.Single(c=>c.Id=="ch13")); var p=e.Active!; p.Position=4; p.Cash=0; D(e,1).OwnerId=p.Id;
-    Roll(e); Equal(e.Phase,"debt");
-    e.Tick(e.Landing!.EndsAt.AddSeconds(10)); Equal(e.Active!.Id,p.Id); Equal(e.Phase,"debt");
+    var resolvedAt=Roll(e); Equal(e.Phase,"debt");
+    e.Tick(resolvedAt.AddSeconds(10)); Equal(e.Active!.Id,p.Id); Equal(e.Phase,"debt");
     e.Execute(p.Id,Cmd("mortgage",1)); Equal(e.Phase,"end");
     e.Tick(DateTimeOffset.UtcNow.AddSeconds(3)); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
 });
@@ -190,6 +197,48 @@ Test("A movement card waits for the destination purchase decision", () => {
     e.Tick(e.Landing!.EndsAt.AddSeconds(10)); Equal(e.Active!.Id,p.Id); Equal(e.Phase,"purchase");
     e.Execute(p.Id,Cmd("buy")); Equal(e.Phase,"end");
     e.Tick(DateTimeOffset.UtcNow.AddSeconds(3)); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
+});
+Test("Chance movement waits for arrival and a two-second card reveal", () => {
+    var e=Game(firstCard:Cards.All.Single(c=>c.Id=="ch05")); var p=e.Active!; p.Position=4;
+    e.Execute(p.Id,Cmd("roll")); e.Tick(e.Roll!.EndsAt);
+    Equal(p.Position,7); Equal(e.LastCard,null); Equal(e.Phase,"card");
+    Equal(string.Join(",",e.Landing!.Path),"4,5,6,7");
+    var arrivedAt=e.Landing.StartedAt;
+    e.Tick(arrivedAt.AddMilliseconds(-1)); Equal(e.RevealingCard,null);
+    e.Tick(arrivedAt); Equal(e.RevealingCard!.Card.Id,"ch05"); Equal(p.Position,7); Equal(e.Landing,null);
+    var revealEndsAt=e.RevealingCard.EndsAt;
+    e.Tick(revealEndsAt.AddMilliseconds(-1)); Equal(p.Position,7);
+    e.Tick(revealEndsAt); Equal(p.Position,15); Equal(e.RevealingCard,null);
+    Equal(string.Join(",",e.Landing!.Path),"7,8,9,10,11,12,13,14,15");
+});
+Test("Consecutive Chance and Chest draws keep separate movements and reveals", () => {
+    var e=Game(firstCard:Cards.All.Single(c=>c.Id=="ch10")); var p=e.Active!; p.Position=33;
+    e.Execute(p.Id,Cmd("roll")); e.Tick(e.Roll!.EndsAt);
+    Equal(string.Join(",",e.Landing!.Path),"33,34,35,36");
+    e.Tick(e.Landing.StartedAt); Equal(e.RevealingCard!.Card.Deck,"chance");
+    e.Tick(e.RevealingCard.EndsAt); Equal(p.Position,33); Equal(e.Phase,"card");
+    Equal(string.Join(",",e.Landing!.Path),"36,35,34,33");
+    e.Tick(e.Landing.StartedAt); Equal(e.RevealingCard!.Card.Deck,"chest"); Equal(e.RevealingCard.Sequence,2L);
+    var endsAt=e.RevealingCard.EndsAt;
+    e.Tick(endsAt.AddMilliseconds(-1)); Equal(p.Position,33);
+    e.Tick(endsAt); Equal(p.Position,0); Equal(e.Landing!.Path[0],33);
+});
+Test("A disconnected player pauses the card effect until reconnection", () => {
+    var e=Game(firstCard:Cards.All.Single(c=>c.Id=="ch05")); var p=e.Active!; p.Position=4;
+    e.Execute(p.Id,Cmd("roll")); e.Tick(e.Roll!.EndsAt); e.Tick(e.Landing!.StartedAt);
+    var endsAt=e.RevealingCard!.EndsAt;
+    e.Presence(p.Id,false); e.Tick(endsAt.AddSeconds(10)); Equal(p.Position,7); Equal(e.RevealingCard!.Card.Id,"ch05");
+    e.Presence(p.Id,true); e.Tick(endsAt.AddSeconds(10)); Equal(p.Position,15); Equal(e.RevealingCard,null);
+});
+Test("A utility card animates arrival before rolling again for rent", () => {
+    var e=Game(dice:[1,2,2,3],firstCard:Cards.All.Single(c=>c.Id=="ch07")); var p=e.Active!; p.Position=4; D(e,12).OwnerId=e.Players[1].Id;
+    e.Execute(p.Id,Cmd("roll")); e.Tick(e.Roll!.EndsAt); e.Tick(e.Landing!.StartedAt);
+    e.Tick(e.RevealingCard!.EndsAt); Equal(e.Phase,"utilityArrival"); Equal(e.Roll!.Utility,false);
+    Equal(string.Join(",",e.Landing!.Path),"7,8,9,10,11,12");
+    var arrivedAt=e.Landing.StartedAt;
+    e.Tick(arrivedAt.AddMilliseconds(-1)); Equal(e.Phase,"utilityArrival"); Equal(p.Cash,1500);
+    e.Tick(arrivedAt); Equal(e.Phase,"rolling"); Equal(e.Roll!.Utility,true); Equal(e.Landing,null);
+    e.Tick(e.Roll.EndsAt); Equal(p.Cash,1450); Equal(e.Players[1].Cash,1550);
 });
 foreach(var card in Cards.All)
 {
@@ -227,7 +276,7 @@ Test("A complete automated match reaches a winner", () => {
         switch(e.Phase)
         {
             case "ready": Roll(e); break;
-            case "rolling": e.Tick(DateTimeOffset.UtcNow.AddSeconds(4)); break;
+            case "rolling": e.Tick(e.Roll!.EndsAt); break;
             case "purchase": e.Execute(e.Active!.Id,Cmd(e.Active.Cash >= Board.Squares[e.Active.Position].Price ? "buy":"decline")); break;
             case "rent": e.Execute(e.Active!.Id,Cmd("payRent")); break;
             case "end": e.Execute(e.Active!.Id,Cmd("endTurn")); break;

@@ -29,7 +29,16 @@ public sealed class Player
     public bool Bankrupt { get; set; }
     public bool InJail { get; set; }
     public int JailAttempts { get; set; }
+    public PlayerStatistics Statistics { get; set; } = new();
     public List<string> JailCards { get; set; } = [];
+}
+
+public sealed class PlayerStatistics
+{
+    public long PaidToPlayers { get; set; }
+    public long ReceivedFromPlayers { get; set; }
+    public int JailVisits { get; set; }
+    public int CardsDrawn { get; set; }
 }
 
 public sealed record Square(int Id, string En, string It, string Type, string Group = "", string Color = "", int Price = 0, int[]? Rents = null, int BuildCost = 0);
@@ -41,6 +50,7 @@ public sealed class Deed
     public bool Mortgaged { get; set; }
 }
 public sealed record Card(string Id, string Deck, string En, string It, string Effect, int Amount = 0, int Target = 0, int HotelAmount = 0);
+public sealed record CardReveal(long Sequence, string PlayerId, Card Card, DateTimeOffset EndsAt);
 public sealed record Payment(string From, string? To, int Amount, string Reason);
 public sealed record LogEntry(long Sequence, string En, string It, DateTimeOffset At);
 public sealed record Roll(string PlayerId, int Die1, int Die2, DateTimeOffset StartedAt, DateTimeOffset EndsAt, bool Utility = false);

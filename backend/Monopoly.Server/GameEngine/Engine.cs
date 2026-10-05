@@ -20,6 +20,9 @@ public sealed partial class Engine
     public Auction? Auction { get; private set; }
     public Trade? Trade { get; private set; }
     public Card? LastCard { get; private set; }
+    public CardReveal? RevealingCard { get; private set; }
+    private string? pendingCardDeck;
+    private string? pendingUtilityRollPlayer;
     private readonly List<(long Sequence, string PlayerId, Card Card, DateTimeOffset At)> cardDraws = [];
     private readonly List<(long Sequence, string PlayerId, int Amount)> moneyEvents = [];
     private long moneySequence;
@@ -111,6 +114,7 @@ public sealed partial class Engine
         winnerId = WinnerId, housesLeft = HousesLeft, hotelsLeft = HotelsLeft,
         rentDue = Phase is "rent" or "consent" or "auction" ? Rent(Deed(Active!.Position)) : 0,
         lastCard = LastCard == null ? null : CardView(LastCard),
+        revealingCard = RevealingCard == null ? null : new { RevealingCard.Sequence, RevealingCard.PlayerId, RevealingCard.EndsAt, card = CardView(RevealingCard.Card) },
         cardDraws = cardDraws.Select(e => new { e.Sequence, e.PlayerId, e.At, card = CardView(e.Card) }),
         moneyEvents = moneyEvents.TakeLast(24).Select(e => new { e.Sequence, e.PlayerId, e.Amount }),
         log = Log.TakeLast(60).Select(e => new { e.Sequence, text = Settings.Italian ? e.It : e.En, e.At }),
@@ -229,15 +233,32 @@ public sealed partial class Engine
         var changed = false;
         if (Phase == "rolling" && Roll != null && now >= Roll.EndsAt) { ResolveRoll(); changed = true; }
         changed |= ShowPendingLanding(now);
-        if (Landing is { } landing && now >= landing.EndsAt && (!landing.AutoAdvance || WaitingFor == null))
+        if (Landing is { } landing && now >= landing.EndsAt && ((!landing.AutoAdvance && Phase is not ("card" or "utilityArrival")) || WaitingFor == null))
         {
             Landing = null;
+            if (Phase == "card" && pendingCardDeck is { } deck)
+            {
+                pendingCardDeck = null;
+                Draw(Find(landing.PlayerId), deck);
+            }
+            if (Phase == "utilityArrival" && pendingUtilityRollPlayer is { } utilityPlayer)
+            {
+                pendingUtilityRollPlayer = null;
+                BeginRoll(Find(utilityPlayer), true);
+            }
             if (landing.AutoAdvance && Phase == "end")
             {
                 Note($"{Find(landing.PlayerId).Name}'s turn finishes.", $"Il turno di {Find(landing.PlayerId).Name} termina.");
                 EndTurn();
             }
             changed = true;
+        }
+        if (RevealingCard is { } reveal && now >= reveal.EndsAt && WaitingFor == null)
+        {
+            RevealingCard = null;
+            ApplyCard(Find(reveal.PlayerId), reveal.Card);
+            changed = true;
+            changed |= ShowPendingLanding(now);
         }
         if (autoEndTurnAt is { } autoAt && now >= autoAt && WaitingFor == null && Phase == "end" && Landing == null && Trade == null)
         {
@@ -268,7 +289,7 @@ public sealed partial class Engine
     {
         utilityRoll = utility;
         jailReleaseRoll = !utility && p.InJail;
-        var now = DateTimeOffset.UtcNow;
+        var now = transitionTime;
         Roll = new(p.Id, nextDie(), nextDie(), now, now.AddSeconds(2.5), utility);
         Phase = "rolling";
         if (!utility) LastCard = null;
@@ -331,18 +352,21 @@ public sealed partial class Engine
                 var d = Deed(s.Id);
                 if (d.OwnerId == null) Phase = "purchase";
                 else if (d.OwnerId == p.Id || (d.Mortgaged && !(s.Type == "street" && Settings.Auctions))) FinishMove();
-                else if (s.Type == "utility" && rentMultiplier == 10) BeginRoll(p, true);
+                else if (s.Type == "utility" && rentMultiplier == 10) { pendingUtilityRollPlayer = p.Id; Phase = "utilityArrival"; }
                 else Phase = "rent";
                 break;
             case "tax": Charge([new(p.Id, null, s.Price * Settings.Scale, "Tax / Tassa")], FinishMove); break;
             case "goToJail": SendToJail(p); break;
-            case "chance": case "chest": Draw(p, s.Type); break;
+            case "chance": case "chest":
+                pendingCardDeck = s.Type; cardTurn = true; Phase = "card";
+                break;
             default: FinishMove(); break;
         }
     }
 
     private void SendToJail(Player p)
     {
+        if (Settings.Jail) p.Statistics.JailVisits++;
         pendingLandingPlayer = p.Id;
         if (movementPath.Count == 0) movementPath.Add(p.Position);
         movementPath.Add(10);
@@ -381,7 +405,8 @@ public sealed partial class Engine
         movementPath.Clear();
         var arrived = now.AddMilliseconds(Math.Max(0, path.Length - 1) * 200);
         var autoAdvance = plain || (Phase == "end" && (cardTurn || Board.Squares[p.Position].Type == "tax"));
-        Landing = new(p.Id, p.Position, now, path, arrived, arrived.AddSeconds(2), arrived.AddSeconds(autoAdvance && plain ? 3 : 2), autoAdvance, extraRoll);
+        var arrivalAction = (Phase == "card" && pendingCardDeck != null) || Phase == "utilityArrival";
+        Landing = new(p.Id, p.Position, now, path, arrived, arrivalAction ? arrived : arrived.AddSeconds(2), arrivalAction ? arrived : arrived.AddSeconds(autoAdvance && plain ? 3 : 2), autoAdvance, extraRoll);
         if (cardTurn && Phase == "end") autoEndTurnAt = Landing.EndsAt;
         return true;
     }
@@ -389,6 +414,9 @@ public sealed partial class Engine
     {
         autoEndTurnAt = null;
         cardTurn = false;
+        pendingCardDeck = null;
+        pendingUtilityRollPlayer = null;
+        RevealingCard = null;
         Landing = null;
         Trade = null;
         if (extraRoll && !Active!.Bankrupt) { Phase = "ready"; extraRoll = false; return; }
@@ -426,12 +454,19 @@ public sealed partial class Engine
 
     private void Draw(Player p, string deck)
     {
+        p.Statistics.CardsDrawn++;
         cardTurn = true;
         var c = decks[deck].Dequeue(); LastCard = c;
-        cardDraws.Add((++cardSequence, p.Id, c, DateTimeOffset.UtcNow));
+        cardDraws.Add((++cardSequence, p.Id, c, transitionTime));
         if (cardDraws.Count > 32) cardDraws.RemoveAt(0);
         if (c.Effect != "jailCard") decks[deck].Enqueue(c);
+        RevealingCard = new(cardSequence, p.Id, c, transitionTime.AddSeconds(2));
+        Phase = "card";
         Note($"{p.Name}: {c.En.Replace("{amount}", Money(c.Amount * Settings.Scale)).Replace("{hotel}", Money(c.HotelAmount * Settings.Scale))}", $"{p.Name}: {c.It.Replace("{amount}", Money(c.Amount * Settings.Scale)).Replace("{hotel}", Money(c.HotelAmount * Settings.Scale))}");
+    }
+
+    private void ApplyCard(Player p, Card c)
+    {
         switch (c.Effect)
         {
             case "move": MoveTo(p, c.Target); break;
@@ -467,6 +502,13 @@ public sealed partial class Engine
         if (moneyEvents.Count > 128) moneyEvents.RemoveAt(0);
     }
 
+    private static void RecordPlayerPayment(Player from, Player to, int amount)
+    {
+        if (amount <= 0 || from.Id == to.Id) return;
+        from.Statistics.PaidToPlayers += amount;
+        to.Statistics.ReceivedFromPlayers += amount;
+    }
+
     private void Charge(IEnumerable<Payment> charges, Action continuation)
     {
         Require(payments.Count == 0, "Another payment is pending.");
@@ -486,6 +528,7 @@ public sealed partial class Engine
             AddMoneyEvent(p.Id, -payment.Amount);
             if (payment.To != null && !Find(payment.To).Bankrupt)
             {
+                RecordPlayerPayment(p, Find(payment.To), payment.Amount);
                 Find(payment.To).Cash = checked(Find(payment.To).Cash + payment.Amount);
                 AddMoneyEvent(payment.To, payment.Amount);
             }

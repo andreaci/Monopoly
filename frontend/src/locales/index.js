@@ -7,6 +7,9 @@ const it = {
 en.sellGroup = 'Sell all buildings in this color group'
 it.sellGroup = 'Vendi tutti gli edifici del gruppo colore'
 Object.assign(en, {
+  position:'Position', noOwner:'This square has no owner.',
+  statistics:'Match statistics', richest:'The richest', poorest:'The poorest', biggestPayer:'The generous spender', biggestCollector:'The money magnet', jailRegular:'Jail regular', propertyTycoon:'Property tycoon', masterBuilder:'Master builder', cardMagnet:'Card magnet', noRecordYet:'No record yet', statisticsHelp:'Wealth = cash + purchase price of deeds and buildings, minus mortgage principal. A hotel counts as five building units. Payments include rent, cards, auctions, trades and bankruptcy cash transfers between players. Ties share the award.',
+  utilitySingle:'One utility', utilityBoth:'Both utilities', diceTotal:'dice total',
   activePlayer:'Current turn',
   buildingsOnlyWhenPresent:'Buildings only on your space', buildingsOnlyWhenPresentHelp:'Build or sell buildings only on the street you occupy during your turn.',
   tradingOnlyWhenOccupied:'Trade only occupied property', tradingOnlyWhenOccupiedHelp:'A player must be standing on a deed before it can be included in a trade.',
@@ -23,6 +26,9 @@ Object.assign(en, {
   mortgagesHelp:'Mortgage undeveloped property for cash. No rent is collected until it is redeemed with interest.'
 })
 Object.assign(it, {
+  position:'Posizione', noOwner:'Questa casella non ha un proprietario.',
+  statistics:'Statistiche della partita', richest:'Il più ricco', poorest:'Il più povero', biggestPayer:'Il portafoglio più generoso', biggestCollector:'La calamita dei soldi', jailRegular:'Cliente fisso della prigione', propertyTycoon:'Il re del mattone', masterBuilder:'Il grande costruttore', cardMagnet:'La calamita delle carte', noRecordYet:'Ancora nessun primato', statisticsHelp:'Patrimonio = contanti + prezzo di acquisto delle proprietà e degli edifici, meno il capitale delle ipoteche. Un albergo conta come cinque edifici. I pagamenti includono affitti, carte, aste, scambi e contanti trasferiti per bancarotta tra giocatori. I pari merito condividono il primato.',
+  utilitySingle:'Una società', utilityBoth:'Entrambe le società', diceTotal:'totale dei dadi',
   activePlayer:'Turno attuale',
   buildingsOnlyWhenPresent:'Edifici solo sulla casella occupata', buildingsOnlyWhenPresentHelp:'Costruisci o vendi edifici solo sulla strada in cui ti trovi durante il tuo turno.',
   tradingOnlyWhenOccupied:'Scambia solo proprietà occupate', tradingOnlyWhenOccupiedHelp:'Un giocatore deve trovarsi sulla proprietà perché possa essere inclusa in uno scambio.',

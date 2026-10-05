@@ -46,16 +46,22 @@ h1,.wordmark,.board-brand>span,.header-subtitle,.deed,.dice-overlay h2{font-fami
 .mini-cards .deed-body,.bank-cards .deed-body,.phone-cards .deed-body{flex:1;padding:6px 3px;font-size:7px}
 .mini-cards .deed-body footer,.bank-cards .deed-body footer,.phone-cards .deed-body footer{font-size:9px}
 .mini-cards .deed-symbol,.bank-cards .deed-symbol,.phone-cards .deed-symbol{font-size:16px;padding:2px}
-.current-turn-badge{padding:3px 6px;border-radius:5px;background:var(--player-color);color:white;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
-.player-section.current{background:linear-gradient(90deg,color-mix(in srgb,var(--player-color) 12%,transparent),transparent 80%);border-radius:8px}
+.player-heading>.current-turn-badge{padding:3px 5px;border-radius:4px;background:var(--player-color);color:white;font-size:9px;line-height:1.2;font-weight:700;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap}
+.player-section.current{background:color-mix(in srgb,var(--player-color) 14%,var(--cream));border:2px solid var(--player-color);border-radius:10px;padding:12px;margin:8px 0}
 @media(min-width:901px){
-  .desktop-table{height:calc(100dvh - 150px);grid-template-rows:minmax(0,1fr) auto;}
+  .desktop-table{height:var(--table-height,calc(100dvh - 150px));grid-template-rows:minmax(0,1fr) auto;}
   .main-board,.players-panel{min-height:0}
-  .main-board .board-viewport{width:min(100%,calc(100dvh - 320px));max-width:calc(100dvh - 320px);margin-inline:auto}
-  .bank-panel{grid-column:1 / -1;height:136px;max-height:136px;overflow:hidden;padding:9px 14px}
+  .main-board{height:100%;overflow:hidden}
+  .players-panel{max-height:100%;overflow:auto}
+  .main-board .board-viewport{max-width:100%;margin-inline:auto}
+  .bank-panel{grid-column:1 / -1;height:auto;max-height:none;overflow:visible;padding:9px 14px}
   .bank-heading{display:flex;align-items:center;justify-content:space-between;margin:0 0 6px}
-  .bank-cards{height:91px;max-height:91px;overflow-x:auto;overflow-y:hidden;align-items:flex-start;padding:0 2px 3px}
-  .bank-cards .card-button{width:clamp(62px,4.4vw,84px);}
-  .bank-cards .deed{height:82px}
+  .bank-heading h2{margin:0}
+  .bank-cards{height:auto;max-height:none;overflow-x:auto;align-items:stretch;padding:6px 2px 10px}
+  .bank-cards .card-button{width:clamp(62px,4.4vw,84px);display:flex}
+  .bank-cards .deed{height:auto;min-height:110px;width:100%}
+  .bank-cards .deed-body{min-height:42px}
 }
 @media(max-width:900px){.board-modal .board-viewport{width:min(calc(100dvh - 184px),calc(100vw - 38px))}}
+
+.statistics-button{padding:5px 8px;font-size:20px;line-height:1;border-radius:8px}.waiting-player-name{font-size:12px;display:flex;align-items:center;gap:5px}.player-heading strong{min-width:0;overflow-wrap:anywhere}.phone-balance{gap:10px}

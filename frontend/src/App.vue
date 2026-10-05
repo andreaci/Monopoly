@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import { useGame } from './stores/game'
@@ -12,20 +12,39 @@ import PropertyDecision from './components/PropertyDecision.vue'
 import CardReveal from './components/CardReveal.vue'
 import TokenIcon from './components/TokenIcon.vue'
 import MoneyEffects from './components/MoneyEffects.vue'
+import PositionCard from './components/PositionCard.vue'
+import ReconnectStatus from './components/ReconnectStatus.vue'
+import StatisticsOverlay from './components/StatisticsOverlay.vue'
 
 const game = useGame(), route = useRoute(), router = useRouter()
+const tableElement = ref(null), tableHeight = ref(null)
+let tableObserver
+function fitTable() {
+  if (tableElement.value) tableHeight.value = Math.max(0, Math.floor(window.innerHeight - tableElement.value.getBoundingClientRect().top - 16))
+}
+watch(tableElement, element => {
+  tableObserver?.disconnect()
+  if (!element) return
+  tableObserver = new ResizeObserver(fitTable)
+  tableObserver.observe(element.parentElement)
+  fitTable()
+})
+watch(() => [game.state?.waitingFor, game.state?.phase, game.error], async () => { await nextTick(); fitTable() })
+onMounted(() => window.addEventListener('resize', fitTable))
+onBeforeUnmount(() => { tableObserver?.disconnect(); window.removeEventListener('resize', fitTable) })
 const baseUrl = import.meta.env.BASE_URL
 const form = ref({language:'en',startingCash:1500,goPayment:200,auctions:true,trading:true,buildings:true,jail:true,mortgages:true,bankRent:false,buildingsOnlyWhenPresent:false,tradingOnlyWhenOccupied:false})
 const joinUrl = ref(''), qr = ref(''), copied = ref(false)
 const joinName = ref(''), joinToken = ref(''), selected = ref(null), expanded = ref(false), selectedDeed = ref(''), bidAmount = ref(1), opening = ref(1), tradeOpen = ref(false)
 const tradeDraft = ref({ to:'',offerCash:0,requestCash:0,offerDeeds:[],requestDeeds:[],offerJailCards:0,requestJailCards:0 })
+const statisticsOpen = ref(false)
 const phone = computed(()=>route.path === '/join' || route.path === '/play')
 const owned = computed(()=>game.state?.deeds.filter(d=>d.ownerId === game.meId).map(d=>game.square(d.squareId)) ?? [])
 const manageOptions = computed(()=>!game.state?.settings.buildingsOnlyWhenPresent ? owned.value : owned.value.filter(square=>square.id===game.me?.position))
 const groups = computed(()=>owned.value.reduce((result,s)=>{ (result[s.group || s.type] ??= []).push(s); return result },{}))
 const bankCards = computed(()=>game.state?.deeds.filter(d=>!d.ownerId).map(d=>game.square(d.squareId)) ?? [])
 const waitingPlayer = computed(()=>game.player(game.state?.waitingFor))
-const phaseText = computed(()=>game.t(({rent:'rentPhase',consent:'consentPhase',auction:'auctionPhase',debt:'debtPhase'})[game.state?.phase] ?? game.state?.phase))
+const phaseText = computed(()=>game.t(({rent:'rentPhase',consent:'consentPhase',auction:'auctionPhase',debt:'debtPhase',card:'cardDraw',utilityArrival:'newLocation'})[game.state?.phase] ?? game.state?.phase))
 const auctionSeconds = computed(()=>game.state?.auction?.paused ? Math.ceil(game.state.auction.remainingSeconds) : Math.max(0,Math.ceil((Date.parse(game.state?.auction?.endsAt)-game.now)/1000)))
 const startReady = computed(()=>game.state?.players.length >= 2 && game.state.players.every(p=>p.connected) && game.online && !game.busy)
 const manageable = computed(()=>['build','sellBuilding','sellGroup','mortgage','unmortgage'].some(game.can))
@@ -78,7 +97,7 @@ async function bankrupt() { if(window.confirm(game.t('bankruptConfirm'))) await 
 <template>
   <div v-if="!game.state" class="loading-screen"><div class="wordmark">MONOPOLY</div><p>{{ game.t('loading') }}</p><p v-if="game.error" role="alert">{{ game.error }}</p><a v-if="game.error" :href="baseUrl">{{ game.t('newMatch') }}</a></div>
   <main v-else :class="{'phone-app':phone}" class="app-shell">
-    <header class="app-header"><RouterLink :to="{path:phone ? '/play':'/',query:{match:game.state.matchId}}" class="wordmark">MONOPOLY</RouterLink><span class="header-subtitle">{{ game.t('table') }}</span><a v-if="!phone && game.manager" :href="baseUrl" class="new-match">{{ game.t('newMatch') }}</a><span class="connection-dot" :class="{online:game.online}"></span><span class="connection-label">{{ game.online ? game.t('connected'):game.t('offline') }}</span></header>
+    <header class="app-header"><RouterLink :to="{path:phone ? '/play':'/',query:{match:game.state.matchId}}" class="wordmark">MONOPOLY</RouterLink><span class="header-subtitle">{{ game.t('table') }}</span><button v-if="game.state.phase!=='lobby'" class="statistics-button" :title="game.t('statistics')" :aria-label="game.t('statistics')" @click="statisticsOpen=true">📊</button><a v-if="!phone && game.manager" :href="baseUrl" class="new-match">{{ game.t('newMatch') }}</a><span class="connection-dot" :class="{online:game.online}"></span><span class="connection-label">{{ game.online ? game.t('connected'):game.t('offline') }}</span></header>
     <div v-if="game.error" class="error-banner" role="alert"><span>{{ game.error }}</span><button @click="game.error=''" :aria-label="game.t('close')">×</button></div>
     <div v-if="!game.online" class="notice" role="status">{{ game.t('offline') }}</div>
 
@@ -93,26 +112,26 @@ async function bankrupt() { if(window.confirm(game.t('bankruptConfirm'))) await 
         <template v-else><p>{{ game.t('managedTable') }}</p><a :href="baseUrl">{{ game.t('newMatch') }}</a></template>
       </div>
       <div class="lobby-column"><div class="panel qr-panel"><span class="eyebrow">{{ game.t('join') }}</span><img v-if="qr" :src="qr" tabindex="0" :alt="game.t('qrCode')" class="qr-image"><label>{{ game.t('lan') }}<input :value="joinUrl" type="url" readonly></label><button :disabled="!qr" @click="copy">{{ game.t(copied?'copied':'copy') }}</button></div>
-        <div class="panel"><h3>{{ game.t('players') }} <span class="count">{{ game.state.players.length }}/6</span></h3><div v-for="p in game.state.players" :key="p.id" class="lobby-player"><span class="token-avatar"><TokenIcon :token="p.token" /></span><strong>{{ p.name }}</strong><span class="status" :class="{present:p.connected}">{{ game.t(p.connected?'connected':'disconnected') }}</span></div><p v-if="!game.state.players.length" class="muted">{{ game.t('waiting') }}…</p></div>
+        <div class="panel"><h3>{{ game.t('players') }} <span class="count">{{ game.state.players.length }}/6</span></h3><div v-for="p in game.state.players" :key="p.id" class="lobby-player"><span class="token-avatar"><TokenIcon :token="p.token" /></span><strong>{{ p.name }} <ReconnectStatus :player="p" /></strong><span class="status" :class="{present:p.connected}">{{ game.t(p.connected?'connected':'disconnected') }}</span></div><p v-if="!game.state.players.length" class="muted">{{ game.t('waiting') }}…</p></div>
       </div>
     </section>
 
     <section v-else-if="phone && !game.me" class="panel join-panel"><span class="eyebrow">MONOPOLY · {{ game.state.players.length }}/6</span><h1>{{ game.t('join') }}</h1><template v-if="game.state.phase==='lobby' && game.state.players.length<6"><form @submit.prevent="join"><label>{{ game.t('name') }}<input v-model="joinName" required maxlength="24" autocomplete="nickname" :placeholder="game.t('name')"></label><label>{{ game.t('chooseToken') }}</label><div v-for="style in ['metal','wood']" :key="style"><h3>{{ game.t(style+'Tokens') }}</h3><div class="token-picker"><button v-for="token in game.state.tokens.filter(t=>t.startsWith('wood-')===(style==='wood'))" :key="token" type="button" :class="{selected:joinToken===token}" :disabled="game.state.players.some(p=>p.token===token)" @click="joinToken=token"><span><TokenIcon :token="token" /></span><small>{{ tokenNames[game.state.settings.italian?'it':'en'][token] }}</small></button></div></div><button type="submit" class="primary wide" :disabled="!joinName.trim() || !joinToken || game.busy || !game.online">{{ game.t('join') }} →</button></form></template><p v-else>{{ game.t('full') }}</p></section>
 
-    <section v-else-if="phone && game.state.phase==='lobby'" class="panel phone-lobby"><div class="big-token"><TokenIcon :token="game.me.token" /></div><h1>{{ game.me.name }}</h1><p>{{ game.t('lobbyHint') }}</p><div v-for="p in game.state.players" :key="p.id" class="lobby-player"><span><TokenIcon :token="p.token" /></span><strong>{{ p.name }}</strong><span class="status" :class="{present:p.connected}">{{ game.t(p.connected?'connected':'disconnected') }}</span></div></section>
+    <section v-else-if="phone && game.state.phase==='lobby'" class="panel phone-lobby"><div class="big-token"><TokenIcon :token="game.me.token" /></div><h1>{{ game.me.name }}</h1><p>{{ game.t('lobbyHint') }}</p><div v-for="p in game.state.players" :key="p.id" class="lobby-player"><span><TokenIcon :token="p.token" /></span><strong>{{ p.name }} <ReconnectStatus :player="p" /></strong><span class="status" :class="{present:p.connected}">{{ game.t(p.connected?'connected':'disconnected') }}</span></div></section>
 
     <template v-else>
       <div v-if="game.state.phase==='finished'" class="winner-banner"><span>🏆</span><h1>{{ game.player(game.state.winnerId)?.name }} {{ game.t('winner') }}</h1><p>{{ game.t('winnerHint') }}</p></div>
-      <div v-if="waitingPlayer" class="notice">{{ game.t('reconnect') }}: <b>{{ waitingPlayer.name }}</b></div>
-      <div v-if="phone" class="turn-strip"><span class="token-avatar"><TokenIcon :token="game.active?.token" /></span><div><span class="eyebrow">{{ game.active?.id===game.meId ? game.t('yourTurn'):game.t('turn') }}</span><strong>{{ game.active?.name }}</strong></div><span class="phase-pill">{{ phaseText }}</span></div>
 
-      <div v-if="!phone" class="desktop-table">
-        <section class="main-board"><BoardViewport :ownership-toggle="game.manager" @select="choose" /><DiceOverlay /></section>
-        <aside class="panel players-panel"><h2>{{ game.t('players') }}</h2><section v-for="(p,index) in game.state.players" :key="p.id" class="player-section" :class="{current:p.id===game.state.activePlayerId,eliminated:p.bankrupt}" :style="{'--player-color':['#d95b58','#458fc4','#d8ad43','#9072b8','#479d81','#d776a1'][index]}"><div class="player-heading"><span><TokenIcon :token="p.token" /></span><strong>{{ p.name }}</strong><span v-if="p.id===game.state.activePlayerId" class="current-turn-badge">{{ game.t('activePlayer') }}</span><b>{{ game.money(p.cash) }}</b></div><small v-if="!p.connected || p.inJail || p.bankrupt">{{ game.t(p.bankrupt?'eliminated':p.inJail?'jailStatus':'disconnected') }}</small><div class="mini-cards"><button v-for="d in game.state.deeds.filter(d=>d.ownerId===p.id)" :key="d.squareId" class="card-button" @click="selected=game.square(d.squareId)"><PropertyCard :square="game.square(d.squareId)" /></button><span v-for="id in p.jailCards" :key="id" class="held-card">▦</span></div></section></aside>
+      <div v-if="phone" class="turn-strip"><span class="token-avatar"><TokenIcon :token="game.active?.token" /></span><div><span class="eyebrow">{{ game.active?.id===game.meId ? game.t('yourTurn'):game.t('turn') }}</span><strong>{{ game.active?.name }} <ReconnectStatus :player="game.active" /></strong></div><span v-if="waitingPlayer && waitingPlayer.id!==game.active?.id" class="waiting-player-name">{{ waitingPlayer.name }} <ReconnectStatus :player="waitingPlayer" /></span><span class="phase-pill">{{ phaseText }}</span></div>
+
+      <div v-if="!phone" ref="tableElement" class="desktop-table" :style="{'--table-height':tableHeight == null ? undefined : `${tableHeight}px`}">
+        <section class="main-board"><BoardViewport fit :ownership-toggle="game.manager" @select="choose" /><DiceOverlay /></section>
+        <aside class="panel players-panel"><h2>{{ game.t('players') }}</h2><section v-for="(p,index) in game.state.players" :key="p.id" class="player-section" :class="{current:p.id===game.state.activePlayerId,eliminated:p.bankrupt}" :style="{'--player-color':['#d95b58','#458fc4','#d8ad43','#9072b8','#479d81','#d776a1'][index]}"><div class="player-heading"><span><TokenIcon :token="p.token" /></span><strong>{{ p.name }} <ReconnectStatus :player="p" /></strong><span v-if="p.id===game.state.activePlayerId" class="current-turn-badge">{{ game.t('activePlayer') }}</span><b>{{ game.money(p.cash) }}</b><PositionCard :player="p" @select="selected=$event" /></div><small v-if="p.inJail || p.bankrupt">{{ game.t(p.bankrupt?'eliminated':p.inJail?'jailStatus':'disconnected') }}</small><div class="mini-cards"><button v-for="d in game.state.deeds.filter(d=>d.ownerId===p.id)" :key="d.squareId" class="card-button" @click="selected=game.square(d.squareId)"><PropertyCard :square="game.square(d.squareId)" /></button><span v-for="id in p.jailCards" :key="id" class="held-card">▦</span></div></section></aside>
         <section class="panel bank-panel"><div class="bank-heading"><h2>{{ game.t('bank') }}</h2><span>{{ game.t('supply') }}: {{ game.state.housesLeft }} ⌂ · {{ game.state.hotelsLeft }} 🏨</span></div><div class="bank-cards"><button v-for="square in bankCards" :key="square.id" class="card-button" @click="selected=square"><PropertyCard :square="square" /></button></div></section>
       </div>
 
-      <div v-else class="phone-game"><div class="phone-balance"><div><span class="eyebrow">{{ game.me.name }}</span><h1>{{ game.money(game.me.cash) }}</h1></div><span class="big-token"><TokenIcon :token="game.me.token" /></span></div>
+      <div v-else class="phone-game"><div class="phone-balance"><div><span class="eyebrow">{{ game.me.name }} <ReconnectStatus :player="game.me" /></span><h1>{{ game.money(game.me.cash) }}</h1></div><span class="big-token"><TokenIcon :token="game.me.token" /></span><PositionCard :player="game.me" @select="selected=$event" /></div>
         <section class="inventory"><h2>{{ game.t('inventory') }}</h2><p v-if="!owned.length" class="muted">{{ game.t('noCards') }}</p><div v-for="(cards,group) in groups" :key="group" class="property-group"><span class="group-color" :style="{background:cards[0].color || '#aaa'}"></span><div class="phone-cards"><button v-for="square in cards" :key="square.id" class="card-button" @click="selected=square"><PropertyCard :square="square" /></button></div></div><button v-for="id in game.me.jailCards" :key="id" class="held-card wide" @click="selected={card:game.state.cards.find(c=>c.id===id)}">▦ {{ game.t('jailCards') }}</button></section>
         <BoardViewport compact @select="choose" @expand="expanded=true" /><p class="fineprint">{{ game.t('zoom') }} · {{ game.t('boardHelp') }}</p>
         <div v-if="game.me.bankrupt" class="notice">{{ game.t('eliminated') }}</div>
@@ -133,9 +152,10 @@ async function bankrupt() { if(window.confirm(game.t('bankruptConfirm'))) await 
       <section class="panel log-panel"><h3>{{ game.t('log') }}</h3><ol><li v-for="entry in [...game.state.log].reverse().slice(0,phone?8:20)" :key="entry.sequence"><time>{{ new Date(entry.at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) }}</time><span>{{ entry.text }}</span></li></ol></section>
     </template>
 
-    <DiceOverlay v-if="phone" phone /><CardReveal v-if="phone" /><TurnPrompt v-if="phone" /><PropertyDecision v-if="phone" /><MoneyEffects />
+    <DiceOverlay v-if="phone" phone /><CardReveal :display="!phone" /><TurnPrompt v-if="phone" /><PropertyDecision v-if="phone" /><MoneyEffects />
     <div v-if="expanded" class="modal board-modal" @click.self="expanded=false"><section class="modal-content"><header><h2>{{ game.t('zoom') }}</h2><button @click="expanded=false">{{ game.t('close') }} ×</button></header><BoardViewport @select="square=>selected=square" /><p class="fineprint">{{ game.t('boardHelp') }}</p></section></div>
-    <div v-if="selected" class="modal" @click.self="selected=null"><section class="modal-content card-modal"><button class="modal-close" @click="selected=null" :aria-label="game.t('close')">×</button><PropertyCard v-if="selected.price && ['street','rail','utility'].includes(selected.type)" :square="selected" detailed /><template v-else><h2>{{ selected.name || game.t(selected.card?.deck==='chance'?'chance':'chest') }}</h2><p>{{ selected.card?.text }}</p><p v-if="selected.type==='tax'">{{ game.money(selected.price) }}</p></template></section></div>
+    <StatisticsOverlay v-if="statisticsOpen" @close="statisticsOpen=false" />
+    <div v-if="selected" class="modal" @click.self="selected=null"><section class="modal-content card-modal"><button class="modal-close" @click="selected=null" :aria-label="game.t('close')">×</button><PropertyCard v-if="selected.price && ['street','rail','utility'].includes(selected.type)" :square="selected" detailed /><template v-else><h2>{{ selected.name || game.t(selected.card?.deck==='chance'?'chance':'chest') }}</h2><p>{{ selected.card?.text }}</p><p v-if="selected.type">{{ game.t('noOwner') }}</p><p v-if="selected.type==='tax'">{{ game.money(selected.price) }}</p></template></section></div>
     <div v-if="tradeOpen" class="modal" @click.self="tradeOpen=false"><section class="modal-content trade-modal"><header><h2>{{ game.t('tradeOffer') }}</h2><button @click="tradeOpen=false">×</button></header><form @submit.prevent="sendTrade"><label>{{ game.t('tradeTo') }}<select v-model="tradeDraft.to" required @change="tradeDraft.requestDeeds=[];tradeDraft.requestJailCards=0"><option value="">—</option><option v-for="p in game.state.players.filter(p=>p.id!==game.meId&&!p.bankrupt)" :key="p.id" :value="p.id">{{ p.name }}</option></select></label><div class="form-row"><label>{{ game.t('offerCash') }}<input v-model.number="tradeDraft.offerCash" type="number" min="0" :max="game.me.cash"></label><label>{{ game.t('requestCash') }}<input v-model.number="tradeDraft.requestCash" type="number" min="0" :max="game.player(tradeDraft.to)?.cash ?? 0"></label></div><div class="trade-columns"><fieldset><legend>{{ game.t('offerDeeds') }}</legend><label v-for="square in offeredDeeds" :key="square.id" class="checkbox"><input v-model="tradeDraft.offerDeeds" type="checkbox" :value="square.id">{{ square.name }}</label></fieldset><fieldset><legend>{{ game.t('requestDeeds') }}</legend><label v-for="square in receiverDeeds" :key="square.id" class="checkbox"><input v-model="tradeDraft.requestDeeds" type="checkbox" :value="square.id">{{ square.name }}</label></fieldset></div><div class="form-row"><label>{{ game.t('offerJail') }}<input v-model.number="tradeDraft.offerJailCards" type="number" min="0" :max="game.me.jailCards.length"></label><label>{{ game.t('requestJail') }}<input v-model.number="tradeDraft.requestJailCards" type="number" min="0" :max="game.player(tradeDraft.to)?.jailCards.length ?? 0"></label></div><p class="fineprint">{{ game.t('transferInterest') }}</p><button class="primary wide" :disabled="!game.can('tradeOffer') || !tradeDraft.to">{{ game.t('confirm') }}</button></form></section></div>
   </main>
 </template>

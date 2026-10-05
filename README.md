@@ -54,7 +54,7 @@ Keep `/monopoly/` in the upstream request path and enable WebSocket upgrades. As
 
 Each new table gets an opaque match ID. Its API requests, WebSocket group and player/manager cookies are isolated from other tables. Refreshing a match URL rejoins that table; **New table** creates a separate match while existing tables continue running. Keep the full match link when opening `/play` or `/display`.
 
-Phone card draws appear as animated fullscreen cards with a Continue button. Consecutive draws are queued, and dismissed cards are remembered for the browser tab. Tokens include both metal-style figurines and painted wooden pieces based on the supplied references.
+Card draws appear after the token arrives on Chance or Community Chest, remain visible for two seconds, and then apply their effect. A movement card starts a separate animation from the card square to its destination; consecutive draws repeat this sequence. Cards also appear on the manager display. Tokens include both metal-style figurines and painted wooden pieces based on the supplied references.
 
 Tokens hop through the server-provided route, then every screen shows the final location in a green overlay. On GO, Just Visiting/Jail and Free Parking, the location is shown for two seconds followed by a one-second turn-finished announcement before advancing automatically. Doubles retain their extra roll. The active player's phone shows a small Roll Dice prompt and fullscreen purchase decisions with two large buttons. Declining a property finishes the turn (or grants the extra roll); insufficient funds for bank rent require debt settlement first.
 
