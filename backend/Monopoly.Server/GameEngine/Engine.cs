@@ -25,6 +25,7 @@ public sealed partial class Engine
     private long moneySequence;
     private DateTimeOffset? autoEndTurnAt;
     private DateTimeOffset transitionTime;
+    private bool cardTurn;
     private long cardSequence;
     public string? WinnerId { get; private set; }
     public int Doubles { get; private set; }
@@ -238,7 +239,7 @@ public sealed partial class Engine
             }
             changed = true;
         }
-        if (autoEndTurnAt is { } autoAt && now >= autoAt && WaitingFor == null && Phase == "end")
+        if (autoEndTurnAt is { } autoAt && now >= autoAt && WaitingFor == null && Phase == "end" && Landing == null && Trade == null)
         {
             autoEndTurnAt = null;
             EndTurn();
@@ -350,7 +351,11 @@ public sealed partial class Engine
         Phase = "end";
     }
 
-    private void FinishMove() { rentMultiplier = 1; Phase = "end"; }
+    private void FinishMove()
+    {
+        rentMultiplier = 1; Phase = "end";
+        if (cardTurn) autoEndTurnAt = transitionTime.AddSeconds(2);
+    }
     private void FinishPaidMove() { FinishMove(); autoEndTurnAt = transitionTime.AddSeconds(2); }
     private void FinishDeclinedPurchase() { FinishMove(); if (finishDeclinedTurn) EndTurn(); finishDeclinedTurn = false; }
     private void SettleBankRent(Deed d)
@@ -375,13 +380,15 @@ public sealed partial class Engine
         var path = movementPath.ToArray();
         movementPath.Clear();
         var arrived = now.AddMilliseconds(Math.Max(0, path.Length - 1) * 200);
-        var autoAdvance = plain || (Phase == "end" && Board.Squares[p.Position].Type == "tax");
+        var autoAdvance = plain || (Phase == "end" && (cardTurn || Board.Squares[p.Position].Type == "tax"));
         Landing = new(p.Id, p.Position, now, path, arrived, arrived.AddSeconds(2), arrived.AddSeconds(autoAdvance && plain ? 3 : 2), autoAdvance, extraRoll);
+        if (cardTurn && Phase == "end") autoEndTurnAt = Landing.EndsAt;
         return true;
     }
     private void EndTurn()
     {
         autoEndTurnAt = null;
+        cardTurn = false;
         Landing = null;
         Trade = null;
         if (extraRoll && !Active!.Bankrupt) { Phase = "ready"; extraRoll = false; return; }
@@ -419,6 +426,7 @@ public sealed partial class Engine
 
     private void Draw(Player p, string deck)
     {
+        cardTurn = true;
         var c = decks[deck].Dequeue(); LastCard = c;
         cardDraws.Add((++cardSequence, p.Id, c, DateTimeOffset.UtcNow));
         if (cardDraws.Count > 32) cardDraws.RemoveAt(0);

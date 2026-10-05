@@ -16,6 +16,7 @@ watch(() => game.state?.moneyEvents, events => {
   for (const event of events) {
     if (event.sequence <= seen) continue
     seen = event.sequence
+    if (event.playerId !== game.meId) continue
     const effect = { ...event, id: ++nextId }
     visible.value.push(effect)
     setTimeout(() => { visible.value = visible.value.filter(item => item.id !== effect.id) }, 1900)

@@ -162,12 +162,34 @@ Test("Utility rent waits two seconds after resolution before advancing the turn"
     e.Tick(resolvedAt);
     Equal(payer.Cash,1450); Equal(e.Players[1].Cash,1550); Equal(e.Active!.Id,payer.Id); Equal(e.Phase,"end");
     e.Tick(resolvedAt.AddMilliseconds(1999)); Equal(e.Active!.Id,payer.Id);
-    e.Tick(resolvedAt.AddSeconds(2)); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
+    e.Tick(resolvedAt.AddSeconds(2)); Equal(e.Active!.Id,payer.Id);
+    e.Tick(e.Landing!.EndsAt); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
 });
 Test("Both complete decks have unique stable IDs", () => {
     Equal(Cards.All.Length,32); Equal(Cards.All.Select(c=>c.Id).Distinct().Count(),32);
     Equal(Cards.All.Count(c=>c.Deck=="chance"),16); Equal(Cards.All.Count(c=>c.Deck=="chest"),16);
     Equal(Board.Squares.Length,40); Equal(Board.Squares.Count(s=>s.Price>0&&s.Type!="tax"),28);
+});
+Test("A completed card automatically advances after its landing display", () => {
+    var e=Game(firstCard:Cards.All.Single(c=>c.Id=="ch08")); var p=e.Active!; p.Position=4;
+    Roll(e); Equal(e.Phase,"end");
+    var endsAt=e.Landing!.EndsAt;
+    e.Tick(endsAt.AddMilliseconds(-1)); Equal(e.Active!.Id,p.Id);
+    e.Tick(endsAt); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
+});
+Test("A card waits for unpaid debt before automatically completing the turn", () => {
+    var e=Game(firstCard:Cards.All.Single(c=>c.Id=="ch13")); var p=e.Active!; p.Position=4; p.Cash=0; D(e,1).OwnerId=p.Id;
+    Roll(e); Equal(e.Phase,"debt");
+    e.Tick(e.Landing!.EndsAt.AddSeconds(10)); Equal(e.Active!.Id,p.Id); Equal(e.Phase,"debt");
+    e.Execute(p.Id,Cmd("mortgage",1)); Equal(e.Phase,"end");
+    e.Tick(DateTimeOffset.UtcNow.AddSeconds(3)); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
+});
+Test("A movement card waits for the destination purchase decision", () => {
+    var e=Game(firstCard:Cards.All.Single(c=>c.Id=="ch03")); var p=e.Active!; p.Position=4;
+    Roll(e); Equal(e.Phase,"purchase");
+    e.Tick(e.Landing!.EndsAt.AddSeconds(10)); Equal(e.Active!.Id,p.Id); Equal(e.Phase,"purchase");
+    e.Execute(p.Id,Cmd("buy")); Equal(e.Phase,"end");
+    e.Tick(DateTimeOffset.UtcNow.AddSeconds(3)); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
 });
 foreach(var card in Cards.All)
 {
