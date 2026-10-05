@@ -7,6 +7,9 @@ const it = {
 en.sellGroup = 'Sell all buildings in this color group'
 it.sellGroup = 'Vendi tutti gli edifici del gruppo colore'
 Object.assign(en, {
+  activePlayer:'Current turn',
+  buildingsOnlyWhenPresent:'Buildings only on your space', buildingsOnlyWhenPresentHelp:'Build or sell buildings only on the street you occupy during your turn.',
+  tradingOnlyWhenOccupied:'Trade only occupied property', tradingOnlyWhenOccupiedHelp:'A player must be standing on a deed before it can be included in a trade.',
   offerToBuy:'Offer to buy',
   declinePayRent:'Pay rent and end turn', declineEndTurn:'Don’t buy, end turn', cannotAffordProperty:'You don’t have enough money to buy this property.',
   showOwners:'Show owners', zoomIn:'Zoom in', zoomOut:'Zoom out', bankRent:'Rent on bank-owned properties', bankRentHelp:'Pay rent to the bank only if you decline to buy an unowned property. Streets and railways use base rent; utilities use the dice total.',
@@ -20,6 +23,9 @@ Object.assign(en, {
   mortgagesHelp:'Mortgage undeveloped property for cash. No rent is collected until it is redeemed with interest.'
 })
 Object.assign(it, {
+  activePlayer:'Turno attuale',
+  buildingsOnlyWhenPresent:'Edifici solo sulla casella occupata', buildingsOnlyWhenPresentHelp:'Costruisci o vendi edifici solo sulla strada in cui ti trovi durante il tuo turno.',
+  tradingOnlyWhenOccupied:'Scambia solo proprietà occupate', tradingOnlyWhenOccupiedHelp:'Un giocatore deve trovarsi sulla proprietà perché possa essere inclusa in uno scambio.',
   offerToBuy:'Proponi l’acquisto',
   declinePayRent:'Paga l’affitto e termina il turno', declineEndTurn:'Non comprare, termina il turno', cannotAffordProperty:'Non hai abbastanza denaro per comprare questa proprietà.',
   showOwners:'Mostra proprietari', zoomIn:'Ingrandisci', zoomOut:'Riduci', bankRent:'Affitto sulle proprietà della banca', bankRentHelp:'Paga l’affitto alla banca solo se scegli di non comprare una proprietà libera. Strade e stazioni usano l’affitto base; le società usano il totale dei dadi.',

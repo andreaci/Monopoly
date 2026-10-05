@@ -11,6 +11,8 @@ public sealed class Settings
     public bool Jail { get; set; } = true;
     public bool Mortgages { get; set; } = true;
     public bool BankRent { get; set; }
+    public bool BuildingsOnlyWhenPresent { get; set; }
+    public bool TradingOnlyWhenOccupied { get; set; }
     public int Scale => Language == "it-GBP" ? 100 : 1;
     public string Currency => Language switch { "en" => "$", "it-GBP" => "£", _ => "€" };
     public bool Italian => Language.StartsWith("it");

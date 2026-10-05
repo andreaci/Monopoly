@@ -27,3 +27,35 @@ h1,.wordmark,.board-brand>span,.header-subtitle,.deed,.dice-overlay h2{font-fami
 .phone-game>.board-viewport{width:100%;max-width:none;margin:0}
 @media(max-width:900px){.setup-layout{grid-template-columns:1fr}.desktop-table{grid-template-columns:minmax(0,1.5fr) minmax(240px,1fr)}}
 @media(max-width:600px){.desktop-table{grid-template-columns:1fr}.rule-options{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.app-header{flex-wrap:wrap}.phone-app .phase-pill{max-width:140px}}
+
+/* Keep the whole expanded board and its exit control inside the visible screen. */
+.board-modal.modal{padding:0;align-items:stretch;overflow:hidden}
+.board-modal .modal-content{width:100%;max-width:none;height:100dvh;max-height:100dvh;min-height:0;border-radius:0;padding:10px 12px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;overflow:hidden}
+.board-modal .modal-content>header{margin:0;min-height:38px}
+.board-modal .board-viewport{width:min(calc(100dvh - 184px),calc(100vw - 38px));height:auto;max-width:none;margin:auto;padding:7px}
+.board-modal .board-clip{width:100%;height:auto;aspect-ratio:1;flex:none}
+.board-modal .modal-content>.fineprint{margin:4px 0 0;text-align:center}
+.phone-app .board-modal .modal-content{height:100dvh;max-height:100dvh;min-height:0;padding:10px 12px}
+@media(min-width:601px){.phone-app .turn-strip{display:none}}
+
+/* Compact deeds keep the rent and purchase price readable without wasting the panel height. */
+.mini-cards .deed,.bank-cards .deed,.phone-cards .deed{aspect-ratio:auto;height:104px;padding:4px}
+.mini-cards .deed-title,.bank-cards .deed-title,.phone-cards .deed-title{min-height:34px;padding:4px 2px}
+.mini-cards .deed-title strong,.bank-cards .deed-title strong,.phone-cards .deed-title strong{font-size:8px;line-height:1.15}
+.mini-cards .deed-title small,.bank-cards .deed-title small,.phone-cards .deed-title small{font-size:5px}
+.mini-cards .deed-body,.bank-cards .deed-body,.phone-cards .deed-body{flex:1;padding:6px 3px;font-size:7px}
+.mini-cards .deed-body footer,.bank-cards .deed-body footer,.phone-cards .deed-body footer{font-size:9px}
+.mini-cards .deed-symbol,.bank-cards .deed-symbol,.phone-cards .deed-symbol{font-size:16px;padding:2px}
+.current-turn-badge{padding:3px 6px;border-radius:5px;background:var(--player-color);color:white;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.player-section.current{background:linear-gradient(90deg,color-mix(in srgb,var(--player-color) 12%,transparent),transparent 80%);border-radius:8px}
+@media(min-width:901px){
+  .desktop-table{height:calc(100dvh - 150px);grid-template-rows:minmax(0,1fr) auto;}
+  .main-board,.players-panel{min-height:0}
+  .main-board .board-viewport{width:min(100%,calc(100dvh - 320px));max-width:calc(100dvh - 320px);margin-inline:auto}
+  .bank-panel{grid-column:1 / -1;height:136px;max-height:136px;overflow:hidden;padding:9px 14px}
+  .bank-heading{display:flex;align-items:center;justify-content:space-between;margin:0 0 6px}
+  .bank-cards{height:91px;max-height:91px;overflow-x:auto;overflow-y:hidden;align-items:flex-start;padding:0 2px 3px}
+  .bank-cards .card-button{width:clamp(62px,4.4vw,84px);}
+  .bank-cards .deed{height:82px}
+}
+@media(max-width:900px){.board-modal .board-viewport{width:min(calc(100dvh - 184px),calc(100vw - 38px))}}

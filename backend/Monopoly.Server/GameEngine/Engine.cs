@@ -21,6 +21,9 @@ public sealed partial class Engine
     public Trade? Trade { get; private set; }
     public Card? LastCard { get; private set; }
     private readonly List<(long Sequence, string PlayerId, Card Card, DateTimeOffset At)> cardDraws = [];
+    private readonly List<(long Sequence, string PlayerId, int Amount)> moneyEvents = [];
+    private long moneySequence;
+    private DateTimeOffset? autoEndTurnAt;
     private long cardSequence;
     public string? WinnerId { get; private set; }
     public int Doubles { get; private set; }
@@ -107,6 +110,7 @@ public sealed partial class Engine
         rentDue = Phase is "rent" or "consent" or "auction" ? Rent(Deed(Active!.Position)) : 0,
         lastCard = LastCard == null ? null : CardView(LastCard),
         cardDraws = cardDraws.Select(e => new { e.Sequence, e.PlayerId, e.At, card = CardView(e.Card) }),
+        moneyEvents = moneyEvents.TakeLast(24).Select(e => new { e.Sequence, e.PlayerId, e.Amount }),
         log = Log.TakeLast(60).Select(e => new { e.Sequence, text = Settings.Italian ? e.It : e.En, e.At }),
         board = Board.Squares.Select(s => new
         {
@@ -159,7 +163,11 @@ public sealed partial class Engine
         var manage = (active && Phase is "ready" or "end") || (Phase == "debt" && Debt?.From == p.Id);
         if (manage && Trade == null)
         {
-            if (Settings.Buildings) { actions.Add("build"); actions.Add("sellBuilding"); actions.Add("sellGroup"); }
+            if (Settings.Buildings)
+            {
+                var canManageBuildings = !Settings.BuildingsOnlyWhenPresent || (active && Deeds.Any(d => d.OwnerId == p.Id && d.SquareId == p.Position && Board.Squares[d.SquareId].Type == "street"));
+                if (canManageBuildings) { actions.Add("build"); actions.Add("sellBuilding"); actions.Add("sellGroup"); }
+            }
             if (Settings.Mortgages) { actions.Add("mortgage"); actions.Add("unmortgage"); }
             if (Settings.Trading) actions.Add("tradeOffer");
         }
@@ -225,6 +233,12 @@ public sealed partial class Engine
                 Note($"{Find(landing.PlayerId).Name}'s turn finishes.", $"Il turno di {Find(landing.PlayerId).Name} termina.");
                 EndTurn();
             }
+            changed = true;
+        }
+        if (autoEndTurnAt is { } autoAt && now >= autoAt && WaitingFor == null && Phase == "end")
+        {
+            autoEndTurnAt = null;
+            EndTurn();
             changed = true;
         }
         if (Phase == "auction" && Auction != null)
@@ -334,6 +348,7 @@ public sealed partial class Engine
     }
 
     private void FinishMove() { rentMultiplier = 1; Phase = "end"; }
+    private void FinishPaidMove() { FinishMove(); autoEndTurnAt = DateTimeOffset.UtcNow.AddSeconds(2); }
     private void FinishDeclinedPurchase() { FinishMove(); if (finishDeclinedTurn) EndTurn(); finishDeclinedTurn = false; }
     private void SettleBankRent(Deed d)
     {
@@ -357,11 +372,13 @@ public sealed partial class Engine
         var path = movementPath.ToArray();
         movementPath.Clear();
         var arrived = now.AddMilliseconds(Math.Max(0, path.Length - 1) * 200);
-        Landing = new(p.Id, p.Position, now, path, arrived, arrived.AddSeconds(2), arrived.AddSeconds(plain ? 3 : 2), plain, extraRoll);
+        var autoAdvance = plain || (Phase == "end" && Board.Squares[p.Position].Type == "tax");
+        Landing = new(p.Id, p.Position, now, path, arrived, arrived.AddSeconds(2), arrived.AddSeconds(autoAdvance && plain ? 3 : 2), autoAdvance, extraRoll);
         return true;
     }
     private void EndTurn()
     {
+        autoEndTurnAt = null;
         Landing = null;
         Trade = null;
         if (extraRoll && !Active!.Bankrupt) { Phase = "ready"; extraRoll = false; return; }
@@ -374,9 +391,9 @@ public sealed partial class Engine
     {
         var d = Deed(p.Position); var s = Square(d); var cost = s.Price * Settings.Scale;
         Require(d.OwnerId == null && p.Cash >= cost, "Not enough cash to buy this deed.");
-        p.Cash -= cost; d.OwnerId = p.Id;
+        p.Cash -= cost; AddMoneyEvent(p.Id, -cost); d.OwnerId = p.Id;
         Note($"{p.Name} buys {s.En} for {Money(cost)}.", $"{p.Name} compra {s.It} per {Money(cost)}.");
-        FinishMove();
+        FinishPaidMove();
     }
 
     private int Rent(Deed d)
@@ -394,7 +411,7 @@ public sealed partial class Engine
         var d = Deed(Active!.Position);
         if (d.OwnerId == null && Settings.BankRent) { SettleBankRent(d); return; }
         var amount = Rent(d);
-        Charge(amount == 0 ? [] : [new(Active.Id, d.OwnerId, amount, "Rent / Affitto")], FinishMove);
+        Charge(amount == 0 ? [] : [new(Active.Id, d.OwnerId, amount, "Rent / Affitto")], FinishPaidMove);
     }
 
     private void Draw(Player p, string deck)
@@ -428,7 +445,15 @@ public sealed partial class Engine
     private void Credit(Player p, int amount, string en, string it)
     {
         p.Cash = checked(p.Cash + amount);
+        AddMoneyEvent(p.Id, amount);
         Note($"{p.Name} receives {Money(amount)} ({en}).", $"{p.Name} riceve {Money(amount)} ({it}).");
+    }
+
+    private void AddMoneyEvent(string playerId, int amount)
+    {
+        if (amount == 0) return;
+        moneyEvents.Add((++moneySequence, playerId, amount));
+        if (moneyEvents.Count > 128) moneyEvents.RemoveAt(0);
     }
 
     private void Charge(IEnumerable<Payment> charges, Action continuation)
@@ -447,7 +472,12 @@ public sealed partial class Engine
             if (p.Bankrupt) { payments.Dequeue(); continue; }
             if (p.Cash < payment.Amount) { Phase = "debt"; return; }
             p.Cash -= payment.Amount;
-            if (payment.To != null && !Find(payment.To).Bankrupt) Find(payment.To).Cash = checked(Find(payment.To).Cash + payment.Amount);
+            AddMoneyEvent(p.Id, -payment.Amount);
+            if (payment.To != null && !Find(payment.To).Bankrupt)
+            {
+                Find(payment.To).Cash = checked(Find(payment.To).Cash + payment.Amount);
+                AddMoneyEvent(payment.To, payment.Amount);
+            }
             Note($"{p.Name} pays {Money(payment.Amount)} to {(payment.To == null ? "the bank" : Find(payment.To).Name)} ({PaymentReason(payment, false)}).", $"{p.Name} paga {Money(payment.Amount)} a {(payment.To == null ? "banca" : Find(payment.To).Name)} ({PaymentReason(payment, true)}).");
             payments.Dequeue();
         }

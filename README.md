@@ -62,29 +62,21 @@ Board zoom resizes the HTML/CSS board so labels and SVG tokens render at the enl
 
 The whole interface uses the device’s standard system sans-serif font, including headings, board labels and cards. No custom fonts or font downloads are required.
 
-[`.github/workflows/docker.yml`](.github/workflows/docker.yml) runs only when a version tag in the form `vX.X.X` is pushed, such as `v1.2.3` or `v10.20.30`. It runs the engine checks, builds the full Docker image with Buildx caching using the default `/monopoly/` base path, starts the image, and verifies both the API and frontend routes. After those checks pass, it publishes the same image to **GitHub Container Registry** as `ghcr.io/<owner>/<repository>:<version-tag>` (repository names are lowercased), and also uploads the image archive as an artifact. The workflow authenticates with GitHub's built-in `GITHUB_TOKEN` and `packages: write`; no extra registry secret is required.
+[`.github/workflows/release.yml`](.github/workflows/release.yml) builds a release when a `v*` tag is pushed, and can also be run manually from **Actions → Release → Run workflow**. For a manual run, enter the release tag (for example, `v1.2.3`) to rebuild and publish the container from the selected branch, which updates the matching GHCR version aliases. It runs the game engine checks, builds the frontend and release archive, publishes the container to **GitHub Container Registry**, and creates or updates the GitHub release. The workflow authenticates with GitHub's built-in `GITHUB_TOKEN` and `packages: write`; no extra registry secret is required.
 
-Following the SeguiLaFolla container metadata template, each release publishes its original tag, semantic version, minor and major aliases (no major alias for `0.x`), and **`latest`**. Every successful release updates `latest` to that release image. For example, `v1.2.3` publishes `ghcr.io/andreaci/monopoly` with tags `v1.2.3`, `1.2.3`, `1.2`, `1`, and `latest`:
+Each release publishes semantic version, minor and major aliases (no major alias for `0.x`), following the SeguiLaFolla container metadata template. For example, `v1.2.3` publishes `ghcr.io/andreaci/monopoly` with tags `1.2.3`, `1.2`, and `1`:
 
 ```powershell
 docker pull ghcr.io/andreaci/monopoly:v1.2.3
 docker run --rm -p 5080:5080 ghcr.io/andreaci/monopoly:v1.2.3
 ```
 
-To use the latest published release:
-
-```powershell
-docker pull ghcr.io/andreaci/monopoly:latest
-docker run --rm -p 5080:5080 ghcr.io/andreaci/monopoly:latest
-```
-
 Open `http://localhost:5080/monopoly/`. New GHCR packages are private by default; set the package visibility to public in GitHub if you want unauthenticated pulls, or authenticate to pull a private package.
 
-Download and unzip the `monopoly-container` artifact, then:
+Download and extract the `Monopoly-v1.2.3.tar.gz` release asset, then:
 
 ```powershell
-docker load -i monopoly-image.tar
-docker run --rm -p 5080:5080 monopoly:ci
+dotnet Monopoly.Server.dll
 ```
 
 ## Development
