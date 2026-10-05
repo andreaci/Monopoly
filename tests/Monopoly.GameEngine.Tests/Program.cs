@@ -154,6 +154,16 @@ Test("Nearest utility card uses a fresh server roll for rent", () => {
     var e=Game(dice:[1,2,2,3],firstCard:Cards.All.Single(c=>c.Id=="ch07")); e.Active!.Position=4; D(e,12).OwnerId=e.Players[1].Id;
     Roll(e); Equal(e.Phase,"rolling"); Equal(e.Roll!.Utility,true); e.Tick(DateTimeOffset.UtcNow.AddSeconds(4)); Equal(e.Active.Cash,1450); Equal(e.Players[1].Cash,1550);
 });
+Test("Utility rent waits two seconds after resolution before advancing the turn", () => {
+    var e=Game(dice:[1,2,2,3],firstCard:Cards.All.Single(c=>c.Id=="ch07"));
+    var payer=e.Active!; payer.Position=4; D(e,12).OwnerId=e.Players[1].Id;
+    Roll(e);
+    var resolvedAt=DateTimeOffset.UtcNow.AddSeconds(4);
+    e.Tick(resolvedAt);
+    Equal(payer.Cash,1450); Equal(e.Players[1].Cash,1550); Equal(e.Active!.Id,payer.Id); Equal(e.Phase,"end");
+    e.Tick(resolvedAt.AddMilliseconds(1999)); Equal(e.Active!.Id,payer.Id);
+    e.Tick(resolvedAt.AddSeconds(2)); Equal(e.Active!.Id,e.Players[1].Id); Equal(e.Phase,"ready");
+});
 Test("Both complete decks have unique stable IDs", () => {
     Equal(Cards.All.Length,32); Equal(Cards.All.Select(c=>c.Id).Distinct().Count(),32);
     Equal(Cards.All.Count(c=>c.Deck=="chance"),16); Equal(Cards.All.Count(c=>c.Deck=="chest"),16);

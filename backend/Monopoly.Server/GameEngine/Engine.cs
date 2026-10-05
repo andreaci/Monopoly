@@ -24,6 +24,7 @@ public sealed partial class Engine
     private readonly List<(long Sequence, string PlayerId, int Amount)> moneyEvents = [];
     private long moneySequence;
     private DateTimeOffset? autoEndTurnAt;
+    private DateTimeOffset transitionTime;
     private long cardSequence;
     public string? WinnerId { get; private set; }
     public int Doubles { get; private set; }
@@ -183,6 +184,7 @@ public sealed partial class Engine
         if (processed.Contains(key)) return;
         var p = Find(playerId);
         Require(Allowed(p).Contains(command.Type), "That action is not available now.");
+        transitionTime = DateTimeOffset.UtcNow;
         switch (command.Type)
         {
             case "roll": BeginRoll(p); break;
@@ -222,6 +224,7 @@ public sealed partial class Engine
 
     public bool Tick(DateTimeOffset now)
     {
+        transitionTime = now;
         var changed = false;
         if (Phase == "rolling" && Roll != null && now >= Roll.EndsAt) { ResolveRoll(); changed = true; }
         changed |= ShowPendingLanding(now);
@@ -348,7 +351,7 @@ public sealed partial class Engine
     }
 
     private void FinishMove() { rentMultiplier = 1; Phase = "end"; }
-    private void FinishPaidMove() { FinishMove(); autoEndTurnAt = DateTimeOffset.UtcNow.AddSeconds(2); }
+    private void FinishPaidMove() { FinishMove(); autoEndTurnAt = transitionTime.AddSeconds(2); }
     private void FinishDeclinedPurchase() { FinishMove(); if (finishDeclinedTurn) EndTurn(); finishDeclinedTurn = false; }
     private void SettleBankRent(Deed d)
     {
