@@ -2,6 +2,11 @@
 
 Vue 3 / JavaScript frontend, ASP.NET Core **.NET 10** backend, and SignalR over WebSockets. Multiple independent in-memory matches, each for 2–6 players. No database or accounts. Restarting the server clears all matches and player sessions.
 
+## AI slop warning
+Parts of this project (including docs, copy, and some implementation drafts) is AI-assisted. Treat generated content as a starting point, not as guaranteed truth. While I checked what AI tools were doing, NEVER TRUST AI. Well, this application is client only with a simple backend but no database, no personal data etcs... So, no actual danger, but still... be careful.
+
+NEVER TRUST GENERATIVE AI BLINDLY. Always review, test, and validate behavior before using it in production.
+
 ## Build and run on Windows
 
 Prerequisites: Node.js 24 with npm, .NET 10 SDK to build, and the ASP.NET Core 10 runtime to run the published application.
