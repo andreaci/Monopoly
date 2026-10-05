@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useGame } from '../stores/game'
+import { squareSymbol } from './squareSymbol'
 const props = defineProps({ player: Object })
 defineEmits(['select'])
 const game = useGame()
@@ -12,7 +13,7 @@ const square = computed(() => {
   }
   return game.square(props.player.position)
 })
-const symbol = computed(() => ({ rail:'🚂', utility:square.value?.id === 12 ? '💡' : '🚰', go:'←', jail:'▦', parking:'🚗', goToJail:'👮', chance:'?', chest:'🧰', tax:'◇' })[square.value?.type])
+const symbol = computed(() => square.value && squareSymbol(square.value))
 </script>
 
 <template>

@@ -65,3 +65,8 @@ h1,.wordmark,.board-brand>span,.header-subtitle,.deed,.dice-overlay h2{font-fami
 @media(max-width:900px){.board-modal .board-viewport{width:min(calc(100dvh - 184px),calc(100vw - 38px))}}
 
 .statistics-button{padding:5px 8px;font-size:20px;line-height:1;border-radius:8px}.waiting-player-name{font-size:12px;display:flex;align-items:center;gap:5px}.player-heading strong{min-width:0;overflow-wrap:anywhere}.phone-balance{gap:10px}
+@media(min-width:901px){.board-modal .board-viewport{width:min(calc(100dvh + 72px),calc(100vw - 38px))}}
+.card-modal .deed.detailed .deed-title small{font-size:10px}
+.card-modal .deed.detailed .deed-title strong{font-size:20px}
+.card-modal .deed.detailed .deed-body{font-size:14px}
+.card-modal .deed.detailed .deed-body footer{font-size:18px}

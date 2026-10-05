@@ -1,6 +1,7 @@
 <script setup>
 import { useGame } from '../stores/game'
 import TokenIcon from './TokenIcon.vue'
+import { squareSymbol as symbol } from './squareSymbol'
 const game = useGame()
 defineProps({ showOwners:Boolean })
 function owner(square) { return game.player(game.deed(square.id)?.ownerId) }
@@ -13,7 +14,7 @@ function movementStep(p) {
 function position(p) { const step = movementStep(p); return step < 0 ? p.position : game.state.landing.path[step] }
 function occupants(square) { return game.state.players.filter(p=>!p.bankrupt && position(p)===square.id) }
 function hopping(p) { return movementStep(p)>0 && game.now < Date.parse(game.state.landing.startedAt) }
-defineEmits(['select'])
+defineEmits(['select','decks'])
 function cell(id) {
   if (id <= 10) return { gridRow:11, gridColumn:11-id }
   if (id <= 20) return { gridRow:21-id, gridColumn:1 }
@@ -21,15 +22,14 @@ function cell(id) {
   return { gridRow:id-29, gridColumn:11 }
 }
 function side(id) { return id % 10 === 0 ? 'corner' : id < 10 ? 'bottom' : id < 20 ? 'left' : id < 30 ? 'top' : 'right' }
-function symbol(square) { return ({go:'←',jail:'▦',parking:'🚗',goToJail:'👮',chance:'?',chest:'🧰',rail:'🚂',tax:'◇',utility:square.id === 12 ? '💡' : '🚰'})[square.type] }
 </script>
 
 <template>
   <div class="board">
     <div class="board-center">
-      <div class="deck-stack chest-stack"><span>🧰</span><strong>{{ game.t('chest') }}</strong></div>
+      <button class="deck-stack chest-stack" @click.stop="$emit('decks')" :aria-label="game.t('deckGuide')"><span>🧰</span><strong>{{ game.t('chest') }}</strong></button>
       <div class="board-brand"><span>MONOPOLY</span><small>{{ game.t('table') }} · {{ game.state.players.length }} {{ game.t('players').toLowerCase() }}</small></div>
-      <div class="deck-stack chance-stack"><span>?</span><strong>{{ game.t('chance') }}</strong></div>
+      <button class="deck-stack chance-stack" @click.stop="$emit('decks')" :aria-label="game.t('deckGuide')"><span>?</span><strong>{{ game.t('chance') }}</strong></button>
       <div class="board-supply">{{ game.state.housesLeft }} ⌂ &nbsp; {{ game.state.hotelsLeft }} 🏨</div>
     </div>
     <button v-for="square in game.state.board" :key="square.id" class="square" :class="[side(square.id), square.type]" :style="cell(square.id)" @click.stop="$emit('select', square)">
@@ -50,6 +50,10 @@ function symbol(square) { return ({go:'←',jail:'▦',parking:'🚗',goToJail:'
   </div>
 </template>
 <style scoped>
+.deck-stack{padding:0;border-radius:0;color:inherit}
+.deck-stack:hover:not(:disabled){filter:brightness(1.06)}
+.chest-stack:hover:not(:disabled){transform:rotate(-35deg)}
+.chance-stack:hover:not(:disabled){transform:rotate(-35deg)}
 .color-band.owner-band{height:32%;min-height:32%;display:flex;flex-direction:column;justify-content:center;gap:.2cqw;padding:.3cqw}
 .board-owner{display:flex;align-items:center;gap:.2cqw;width:100%;min-width:0;background:#fff5e6ed;color:#17382b;border-radius:.3cqw;padding:0 .2cqw;font-size:.95cqw;line-height:1.2}
 .board-owner :deep(.token-figure){width:1.6cqw;height:1.6cqw;flex-shrink:0}.board-owner b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.band-buildings{font-size:1cqw;line-height:1}
