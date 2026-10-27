@@ -72,8 +72,7 @@ The whole interface uses the device’s standard system sans-serif font, includi
 Each release publishes semantic version, minor and major aliases (no major alias for `0.x`), following the SeguiLaFolla container metadata template. For example, `v1.2.3` publishes `ghcr.io/andreaci/monopoly` with tags `1.2.3`, `1.2`, and `1`:
 
 ```powershell
-docker pull ghcr.io/andreaci/monopoly:v1.2.3
-docker run --rm -p 5080:5080 ghcr.io/andreaci/monopoly:v1.2.3
+docker run -d -p 5080:5080 ghcr.io/andreaci/monopoly:latest
 ```
 
 Open `http://localhost:5080/monopoly/`. New GHCR packages are private by default; set the package visibility to public in GitHub if you want unauthenticated pulls, or authenticate to pull a private package.
